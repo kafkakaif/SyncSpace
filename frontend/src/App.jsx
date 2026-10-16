@@ -1,133 +1,65 @@
+import React, { useState } from 'react';
+import Navbar from './components/Navbar';
+import Hero from './components/Hero';
+import InteractivePlayground from './components/InteractivePlayground';
+import Features from './components/Features';
+import ArchitectureSection from './components/ArchitectureSection';
+import FAQ from './components/FAQ';
+import Footer from './components/Footer';
+import SyncSpacePage from './components/SyncSpacePage';
+import './App.css';
 
-import { useEffect, useState } from "react";
-import socket from "./services/socket";
-import "./App.css";
+export default function App() {
+  // First, always open Landing page by default
+  const [currentPage, setCurrentPage] = useState('landing'); // 'landing' | 'syncspace'
+  const [selectedRoom, setSelectedRoom] = useState('');
 
-function App() {
-  const [roomId, setRoomId] = useState("");
-  const [activeRoom, setActiveRoom] = useState("");
-  const [status, setStatus] = useState("Disconnected");
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    const onConnect = () => setStatus("Connected");
-    const onDisconnect = () => setStatus("Disconnected");
-
-    const onRoomJoined = ({ roomId }) => {
-      setActiveRoom(roomId);
-      setMessage(`Successfully joined room: ${roomId}`);
-    };
-
-    const onRoomLeft = ({ roomId }) => {
-      setActiveRoom((current) =>
-        current === roomId ? "" : current
-      );
-      setMessage(`Left room: ${roomId}`);
-    };
-
-    const onRoomError = ({ message }) => setMessage(message);
-
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-    socket.on("room-joined", onRoomJoined);
-    socket.on("room-left", onRoomLeft);
-    socket.on("room-error", onRoomError);
-
-    socket.connect();
-
-    return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-      socket.off("room-joined", onRoomJoined);
-      socket.off("room-left", onRoomLeft);
-      socket.off("room-error", onRoomError);
-      socket.disconnect();
-    };
-  }, []);
-
-  const joinRoom = () => {
-    const trimmedRoomId = roomId.trim();
-
-    if (!trimmedRoomId) {
-      setMessage("Please enter a room ID.");
-      return;
-    }
-
-    if (!socket.connected) {
-      setMessage("Connecting to server. Please try again.");
-      return;
-    }
-
-    socket.emit("join-room", trimmedRoomId);
+  const handleOpenSyncSpace = (roomId = '') => {
+    setSelectedRoom(roomId);
+    setCurrentPage('syncspace');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const leaveRoom = () => {
-    if (activeRoom) {
-      socket.emit("leave-room", activeRoom);
-    }
+  const handleBackToLanding = () => {
+    setCurrentPage('landing');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // If user clicked Navbar or CTA, show the SyncSpace workspace page
+  if (currentPage === 'syncspace') {
+    return (
+      <SyncSpacePage
+        initialRoomId={selectedRoom}
+        onBackToLanding={handleBackToLanding}
+      />
+    );
+  }
+
+  // Otherwise, ALWAYS show the Landing page first!
   return (
-    <main className="app">
-      <header className="topbar">
-        <div>
-          <h1>SyncSpace</h1>
-          <p>Real-time collaborative workspace</p>
-        </div>
-        <span className={`status ${socket.connected ? "online" : ""}`}>
-          ● {status}
-        </span>
-      </header>
+    <div className="landing-page-root">
+      {/* Navbar with "Open SyncSpace" button */}
+      <Navbar onOpenWorkspace={() => handleOpenSyncSpace()} />
 
-      <section className="room-controls">
-        <input
-          value={roomId}
-          onChange={(event) => setRoomId(event.target.value)}
-          placeholder="Enter a room ID, e.g. team-room"
-          maxLength={100}
-          aria-label="Room ID"
-        />
-        <button onClick={joinRoom}>Join Room</button>
-        <button className="secondary" onClick={leaveRoom}>
-          Leave Room
-        </button>
-        <span className="active-room">
-          {activeRoom ? `Room: ${activeRoom}` : "No room joined"}
-        </span>
-      </section>
+      <main>
+        {/* Hero Section with Quick Room Launch */}
+        <Hero onJoinRoom={(roomId) => handleOpenSyncSpace(roomId)} />
 
-      {message && <p className="message">{message}</p>}
+        {/* Live Interactive Playground / Demo */}
+        <InteractivePlayground onLaunchRoom={(roomId) => handleOpenSyncSpace(roomId)} />
 
-      <section className="workspace">
-        <div className="panel">
-          <div className="panel-heading">
-            <span>01</span>
-            <h2>Whiteboard</h2>
-          </div>
-          <div className="placeholder">
-            <span className="placeholder-icon">✏️</span>
-            <h3>Collaborative Canvas</h3>
-            <p>Drawing tools will be added in Week 2.</p>
-          </div>
-        </div>
+        {/* Core Capabilities */}
+        <Features />
 
-        <div className="panel">
-          <div className="panel-heading">
-            <span>02</span>
-            <h2>Code Editor</h2>
-          </div>
-          <div className="code-placeholder">
-            <div className="code-toolbar">JavaScript · Preview</div>
-            <pre>
-              <code>{`// Welcome to SyncSpace\n\nfunction collaborate() {\n  // Monaco Editor arrives in Week 3\n}`}</code>
-            </pre>
-          </div>
-        </div>
-      </section>
+        {/* System Architecture */}
+        <ArchitectureSection />
 
-      <footer>SyncSpace · Axlero · Week 1</footer>
-    </main>
+        {/* FAQ */}
+        <FAQ />
+      </main>
+
+      {/* Footer */}
+      <Footer onOpenWorkspace={() => handleOpenSyncSpace()} />
+    </div>
   );
 }
-
-export default App;
