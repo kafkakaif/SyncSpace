@@ -1,122 +1,133 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+
+import { useEffect, useState } from "react";
+import socket from "./services/socket";
+import "./App.css";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [roomId, setRoomId] = useState("");
+  const [activeRoom, setActiveRoom] = useState("");
+  const [status, setStatus] = useState("Disconnected");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const onConnect = () => setStatus("Connected");
+    const onDisconnect = () => setStatus("Disconnected");
+
+    const onRoomJoined = ({ roomId }) => {
+      setActiveRoom(roomId);
+      setMessage(`Successfully joined room: ${roomId}`);
+    };
+
+    const onRoomLeft = ({ roomId }) => {
+      setActiveRoom((current) =>
+        current === roomId ? "" : current
+      );
+      setMessage(`Left room: ${roomId}`);
+    };
+
+    const onRoomError = ({ message }) => setMessage(message);
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("room-joined", onRoomJoined);
+    socket.on("room-left", onRoomLeft);
+    socket.on("room-error", onRoomError);
+
+    socket.connect();
+
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("room-joined", onRoomJoined);
+      socket.off("room-left", onRoomLeft);
+      socket.off("room-error", onRoomError);
+      socket.disconnect();
+    };
+  }, []);
+
+  const joinRoom = () => {
+    const trimmedRoomId = roomId.trim();
+
+    if (!trimmedRoomId) {
+      setMessage("Please enter a room ID.");
+      return;
+    }
+
+    if (!socket.connected) {
+      setMessage("Connecting to server. Please try again.");
+      return;
+    }
+
+    socket.emit("join-room", trimmedRoomId);
+  };
+
+  const leaveRoom = () => {
+    if (activeRoom) {
+      socket.emit("leave-room", activeRoom);
+    }
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <main className="app">
+      <header className="topbar">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+          <h1>SyncSpace</h1>
+          <p>Real-time collaborative workspace</p>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
+        <span className={`status ${socket.connected ? "online" : ""}`}>
+          ● {status}
+        </span>
+      </header>
+
+      <section className="room-controls">
+        <input
+          value={roomId}
+          onChange={(event) => setRoomId(event.target.value)}
+          placeholder="Enter a room ID, e.g. team-room"
+          maxLength={100}
+          aria-label="Room ID"
+        />
+        <button onClick={joinRoom}>Join Room</button>
+        <button className="secondary" onClick={leaveRoom}>
+          Leave Room
         </button>
+        <span className="active-room">
+          {activeRoom ? `Room: ${activeRoom}` : "No room joined"}
+        </span>
       </section>
 
-      <div className="ticks"></div>
+      {message && <p className="message">{message}</p>}
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      <section className="workspace">
+        <div className="panel">
+          <div className="panel-heading">
+            <span>01</span>
+            <h2>Whiteboard</h2>
+          </div>
+          <div className="placeholder">
+            <span className="placeholder-icon">✏️</span>
+            <h3>Collaborative Canvas</h3>
+            <p>Drawing tools will be added in Week 2.</p>
+          </div>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
+
+        <div className="panel">
+          <div className="panel-heading">
+            <span>02</span>
+            <h2>Code Editor</h2>
+          </div>
+          <div className="code-placeholder">
+            <div className="code-toolbar">JavaScript · Preview</div>
+            <pre>
+              <code>{`// Welcome to SyncSpace\n\nfunction collaborate() {\n  // Monaco Editor arrives in Week 3\n}`}</code>
+            </pre>
+          </div>
         </div>
       </section>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <footer>SyncSpace · Axlero · Week 1</footer>
+    </main>
+  );
 }
 
-export default App
+export default App;
