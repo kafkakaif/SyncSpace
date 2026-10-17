@@ -36,6 +36,7 @@ io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
 
+
 socket.on("join-room", (roomId) => {
   if (
     typeof roomId !== "string" ||
@@ -50,7 +51,7 @@ socket.on("join-room", (roomId) => {
 
   const cleanRoomId = roomId.trim();
 
-  // Leave previous application rooms first
+  // Leave previous application rooms
   for (const room of socket.rooms) {
     if (room !== socket.id) {
       socket.leave(room);
@@ -58,10 +59,14 @@ socket.on("join-room", (roomId) => {
   }
 
   socket.join(cleanRoomId);
-  socket.emit("room-joined", { roomId: cleanRoomId });
+
+  socket.emit("room-joined", {
+    roomId: cleanRoomId,
+  });
 
   console.log(`${socket.id} joined room: ${cleanRoomId}`);
 });
+
 
 
   socket.on("leave-room", (roomId) => {
