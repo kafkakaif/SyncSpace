@@ -78,6 +78,73 @@ socket.on("join-room", (roomId) => {
     console.log(`${socket.id} left room: ${roomId}`);
   });
 
+  
+  // Real-time whiteboard drawing
+  socket.on("whiteboard:segment", (data) => {
+    if (!data || typeof data !== "object") return;
+
+    const { roomId, x1, y1, x2, y2, color } = data;
+
+    // Only allow drawing in a room this socket has joined
+    if (
+      typeof roomId !== "string" ||
+      !socket.rooms.has(roomId) ||
+      ![x1, y1, x2, y2].every(
+        (value) =>
+          typeof value === "number" &&
+          Number.isFinite(value) &&
+          Math.abs(value) <= 10000
+      ) ||
+      typeof color !== "string" ||
+      !/^#[0-9a-fA-F]{6}$/.test(color)
+    ) {
+      return;
+    }
+
+    // Broadcast to other users in this room, not the sender
+    socket.to(roomId).emit("whiteboard:segment", {
+      roomId,
+      x1,
+      y1,
+      x2,
+      y2,
+      color,
+    });
+  });
+
+  // Clear the shared whiteboard
+  socket.on("whiteboard:clear", (roomId) => {
+    if (
+      typeof roomId !== "string" ||
+      !socket.rooms.has(roomId)
+    ) {
+      return;
+    }
+
+    socket.to(roomId).emit("whiteboard:clear", roomId);
+  });
+  
+socket.on("code:update", (data) => {
+  if (!data || typeof data !== "object") return;
+
+  const { roomId, code } = data;
+
+  if (
+    typeof roomId !== "string" ||
+    !socket.rooms.has(roomId) ||
+    typeof code !== "string" ||
+    code.length > 100000
+  ) {
+    return;
+  }
+
+  // Share code with other users in the same room
+  socket.to(roomId).emit("code:update", {
+    roomId,
+    code,
+  });
+});
+
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
   });
