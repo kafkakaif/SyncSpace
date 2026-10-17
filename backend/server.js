@@ -35,23 +35,34 @@ app.get("/health", (req, res) => {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("join-room", (roomId) => {
-    if (
-      typeof roomId !== "string" ||
-      roomId.trim().length === 0 ||
-      roomId.length > 100
-    ) {
-      socket.emit("room-error", {
-        message: "Please provide a valid room ID."
-      });
-      return;
+
+socket.on("join-room", (roomId) => {
+  if (
+    typeof roomId !== "string" ||
+    roomId.trim().length === 0 ||
+    roomId.trim().length > 100
+  ) {
+    socket.emit("room-error", {
+      message: "Please provide a valid room ID.",
+    });
+    return;
+  }
+
+  const cleanRoomId = roomId.trim();
+
+  // Leave previous application rooms first
+  for (const room of socket.rooms) {
+    if (room !== socket.id) {
+      socket.leave(room);
     }
+  }
 
-    socket.join(roomId);
-    socket.emit("room-joined", { roomId });
+  socket.join(cleanRoomId);
+  socket.emit("room-joined", { roomId: cleanRoomId });
 
-    console.log(`${socket.id} joined room: ${roomId}`);
-  });
+  console.log(`${socket.id} joined room: ${cleanRoomId}`);
+});
+
 
   socket.on("leave-room", (roomId) => {
     if (typeof roomId !== "string") return;
