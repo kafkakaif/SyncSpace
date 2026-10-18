@@ -407,7 +407,7 @@ export default function SyncSpacePage({
               <h2>Code Editor</h2>
             </div>
             <div className="code-placeholder">
-              <div className="code-toolbar">JavaScript · Collaborative Editor</div>
+              <div className="code-toolbar"><span>JavaScript</span><span className="editor-live-label">Room sync</span></div>
               <textarea
                 aria-label="Collaborative code editor"
                 value={codeContent}
@@ -420,7 +420,7 @@ export default function SyncSpacePage({
           </div>
         </section>
 
-        <footer>SyncSpace · Axlero · Collaborative Workspace</footer>
+        <footer>SyncSpace <span aria-hidden="true">·</span> Collaborative workspace</footer>
       </main>
     </div>
   );

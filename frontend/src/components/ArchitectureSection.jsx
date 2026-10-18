@@ -4,57 +4,57 @@ const ARCH_LAYERS = [
   {
     id: 'frontend',
     name: 'Frontend Client Layer',
-    badge: 'React 19 + Vite',
-    tagline: 'Split-Screen Canvas & Code Studio',
+    badge: 'React + Vite',
+    tagline: 'Canvas and code editor interface',
     details: [
-      'React-Konva high-efficiency HTML5 canvas rendering vector strokes at 60 FPS',
-      'Monaco Editor embedded with language syntax parsers & multiplayer cursor decorators',
-      'Socket.io Client managing persistent bidirectional WebSocket connections',
-      'Local state buffering for zero-lag optimistic UI updates'
+      'React components render the landing page and collaboration workspace',
+      'Native HTML canvas handles local and incoming freehand drawing segments',
+      'A lightweight textarea provides the current shared code editing experience',
+      'Socket.IO client sends and receives room-scoped collaboration events'
     ],
-    tech: ['React 19', 'Vite 8', 'Socket.io-client', 'Konva.js', 'Monaco Editor'],
+    tech: ['React', 'Vite', 'HTML Canvas', 'Socket.IO Client'],
     accent: '#8b5cf6'
   },
   {
     id: 'gateway',
     name: 'Real-Time Transport Gateway',
-    badge: 'Node.js + Express + Socket.io',
-    tagline: 'Isolated WebSocket Room Routing',
+    badge: 'Node.js + Express + Socket.IO',
+    tagline: 'Room-scoped event delivery',
     details: [
-      'Socket.io Rooms namespace: room-based pub/sub message propagation',
-      'Strict input validation & error dispatch preventing injection or invalid room IDs',
-      'Automatic client reconnection, ping/pong heartbeats, and peer disconnection tracking',
-      'CORS-protected HTTP API & Health-check endpoints'
+      'Socket.IO rooms route drawing and code updates to connected peers',
+      'Room IDs are validated before joining',
+      'HTTP health endpoint reports that the backend is running',
+      'CORS is configured for local frontend development origins'
     ],
-    tech: ['Node.js', 'Express', 'Socket.io', 'CORS', 'Dotenv'],
+    tech: ['Node.js', 'Express', 'Socket.IO', 'CORS', 'Dotenv'],
     accent: '#06b6d4'
   },
   {
     id: 'crdt',
-    name: 'Synchronization & Awareness Engine',
-    badge: 'Yjs CRDT',
-    tagline: 'Conflict-Free Document State Convergence',
+    name: 'Collaboration Improvements',
+    badge: 'Planned next',
+    tagline: 'Conflict-free editing and presence',
     details: [
-      'Mathematically proven CRDT (Conflict-free Replicated Data Types)',
-      'Sub-50ms peer-to-peer sync with binary encoded delta updates',
-      'Awareness protocol tracking remote cursor positions, selections, and user tags',
-      'Deterministic convergence: any order of received edits results in identical state'
+      'Yjs can provide shared document structures for concurrent edits',
+      'Awareness can represent collaborator presence and cursor positions',
+      'The current code editor broadcasts full text updates and can overwrite simultaneous edits',
+      'These capabilities should be integrated and tested before being advertised as available'
     ],
-    tech: ['Yjs', 'y-websocket', 'y-monaco', 'Binary Delta Encoders'],
+    tech: ['Planned: Yjs', 'Planned: Awareness', 'Planned: Monaco binding'],
     accent: '#10b981'
   },
   {
     id: 'storage',
-    name: 'Persistence & Recovery Store',
-    badge: 'MongoDB Database',
-    tagline: 'Session History & State Restoration',
+    name: 'Persistence & Recovery',
+    badge: 'Planned next',
+    tagline: 'Save and restore shared work',
     details: [
-      'Document snapshots stored in binary-safe BSON format for instant hydration',
-      'Room session metadata: timestamps, active participants, invite tokens',
-      'Timeline audit trail enabling historical rewind and session replay',
-      'Resilient crash recovery restoring active canvases upon server reboot'
+      'Database persistence is not connected in the current implementation',
+      'A future store could save shared code and drawing state per room',
+      'Room access control and user authentication still need implementation',
+      'Saved snapshots could enable recovery after refresh or server restart'
     ],
-    tech: ['MongoDB', 'Mongoose', 'BSON Binary Buffer', 'JWT Auth'],
+    tech: ['Planned: MongoDB', 'Planned: Mongoose', 'Planned: Authentication'],
     accent: '#f59e0b'
   }
 ];
@@ -67,9 +67,9 @@ export default function ArchitectureSection() {
     <section id="architecture" className="architecture-section">
       <div className="section-header-centered">
         <div className="section-pill">System Architecture</div>
-        <h2 className="section-title">Engineered for Low-Latency Resilience</h2>
+        <h2 className="section-title">A clear path from UI to collaboration</h2>
         <p className="section-subtitle">
-          Explore the multi-tier real-time pipeline powering SyncSpace. Click any layer below to inspect its protocols and guarantees.
+          Explore the current frontend and Socket.IO backend, plus planned improvements for conflict-free editing and persistence.
         </p>
       </div>
 
@@ -103,7 +103,7 @@ export default function ArchitectureSection() {
                     <div className="connector-line"></div>
                     <div className="connector-pulse"></div>
                     <span className="connector-label">
-                      {index === 0 ? 'WebSocket / Socket.io Events' : index === 1 ? 'CRDT Binary Deltas' : 'BSON Persistence'}
+                      {index === 0 ? 'Socket.IO events' : index === 1 ? 'Planned: Yjs' : 'Planned: persistence'}
                     </span>
                   </div>
                 )}
@@ -121,7 +121,7 @@ export default function ArchitectureSection() {
           </div>
 
           <div className="details-content-block">
-            <h4 className="content-heading">Engineering Highlights & Guarantees:</h4>
+            <h4 className="content-heading">Current implementation and roadmap:</h4>
             <ul className="details-list">
               {activeLayer.details.map((item, idx) => (
                 <li key={idx} className="details-list-item">

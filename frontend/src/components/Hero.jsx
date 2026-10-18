@@ -37,22 +37,21 @@ export default function Hero({ onJoinRoom }) {
         <div className="hero-badge-wrapper">
           <div className="hero-pill-badge">
             <span className="pulse-indicator"></span>
-            <span className="badge-text">Week 1 Foundation Active</span>
+            <span className="badge-text">A shared space for engineering teams</span>
             <span className="badge-divider">·</span>
-            <span className="badge-sub">Bi-directional Socket.io Rooms</span>
+            <span className="badge-sub">Whiteboard + collaborative code</span>
           </div>
         </div>
 
         {/* Main Title */}
         <h1 className="hero-title">
-          Where Architecture Meets Code. <br />
+          Think together. Build together. <br />
           <span className="hero-gradient-text">In Real Time.</span>
         </h1>
 
         {/* Subtitle */}
         <p className="hero-subtitle">
-          Eliminate disjointed meetings and static screenshots. SyncSpace unites an interactive 
-          whiteboard and collaborative code editor into a single synchronized studio for distributed engineering teams.
+          Bring system sketches and code into one shared workspace. Create a room, invite your teammates, and work through ideas together.
         </p>
 
         {/* Quick Launch Control Card */}
@@ -99,23 +98,23 @@ export default function Hero({ onJoinRoom }) {
         {/* Key Metrics / Highlights */}
         <div className="hero-metrics-grid">
           <div className="metric-item">
-            <span className="metric-value">&lt; 50ms</span>
-            <span className="metric-label">Socket Event Latency</span>
+            <span className="metric-value">One space</span>
+            <span className="metric-label">Ideas and implementation</span>
           </div>
           <div className="metric-divider"></div>
           <div className="metric-item">
-            <span className="metric-value">Zero Collisions</span>
-            <span className="metric-label">Yjs CRDT Conflict Resolver</span>
+            <span className="metric-value">Room-based</span>
+            <span className="metric-label">Shared sessions</span>
           </div>
           <div className="metric-divider"></div>
           <div className="metric-item">
-            <span className="metric-value">Isolated</span>
-            <span className="metric-label">Multi-Tenant Room Security</span>
+            <span className="metric-value">Live</span>
+            <span className="metric-label">Drawing and code updates</span>
           </div>
           <div className="metric-divider"></div>
           <div className="metric-item">
-            <span className="metric-value">Dual-Pane</span>
-            <span className="metric-label">Canvas & Monaco Synced</span>
+            <span className="metric-value">Together</span>
+            <span className="metric-label">Canvas + code editor</span>
           </div>
         </div>
       </div>

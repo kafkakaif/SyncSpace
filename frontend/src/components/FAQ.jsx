@@ -3,19 +3,19 @@ import React, { useState } from 'react';
 const FAQ_ITEMS = [
   {
     q: 'How does SyncSpace resolve simultaneous conflicting edits without overwriting?',
-    a: 'SyncSpace utilizes Yjs, a high-performance Conflict-free Replicated Data Type (CRDT) engine. Instead of relying on a centralized lock or naive last-write-wins timestamps, edits are tracked as deterministic operations. When multiple developers type or draw at the same moment, the operations automatically converge on all screens identically without race conditions.'
+    a: 'The current editor broadcasts code updates to others in the same room. It does not yet use Yjs, so simultaneous edits can overwrite each other. Conflict-free editing is a planned improvement.'
   },
   {
     q: 'Can two or more browser tabs join the same room right now in Week 1?',
-    a: 'Yes! Open http://localhost:3000 in two separate browser windows or tabs, enter the same room ID (for example, "team-arch"), and click Join Room. The server will isolate your room and broadcast peer connection updates between them.'
+    a: 'Yes. Open the app in two browser tabs, enter the same room ID, and join. Drawing strokes, clear events, and code updates are shared with other connected users in that room.'
   },
   {
     q: 'How does room isolation work on the backend?',
-    a: 'On the server side, Express and Socket.io maintain isolated room rooms using socket.join(roomId). Messages emitted with socket.to(roomId) only propagate to sockets currently in that room. Sockets in room "alpha" will never receive drawing strokes, cursors, or code modifications from room "beta".'
+    a: 'The backend uses Socket.IO rooms and broadcasts drawing and code events to other sockets in the selected room. Keep room IDs private when you only want invited teammates to use a room; authentication and invite permissions are not implemented yet.'
   },
   {
     q: 'What happens if a user temporarily loses internet connection?',
-    a: 'The Socket.io client automatically attempts reconnection with exponential backoff. Once re-established, the client syncs with the room document, pulling down any missing binary deltas to restore the latest canvas and code states.'
+    a: 'The Socket.IO client is configured to attempt reconnection. The current version does not persist a document history or restore missed drawing and code changes automatically, so work may need to be shared again after reconnecting.'
   },
   {
     q: 'Why combine the whiteboard and code editor into one screen?',

@@ -224,26 +224,22 @@ export default function InteractivePlayground({ onLaunchRoom }) {
   const handleTabChange = (filename) => {
     setActiveTab(filename);
     setCodeContent(CODE_SNIPPETS[filename]);
-    setConsoleOutput(`Switched buffer to ${filename}. Live multiplayer buffer attached.`);
+    setConsoleOutput(`Showing the ${filename} example snippet. This preview is not connected to a live room.`);
   };
 
   const runCodeSimulation = () => {
     setIsRunning(true);
-    setConsoleOutput('Executing test payload...');
-    setTimeout(() => {
-      setIsRunning(false);
-      setConsoleOutput(`[OK] Room broadcast verified. 3 connected peers acknowledged state in 22ms.`);
-    }, 700);
+    setConsoleOutput('Preview only: open a studio room to test real-time room synchronization.');
+    setTimeout(() => setIsRunning(false), 350);
   };
 
   return (
     <section id="playground" className="playground-section">
       <div className="section-header-centered">
         <div className="section-pill">Interactive Demo</div>
-        <h2 className="section-title">The Unified Split-Screen Studio</h2>
+        <h2 className="section-title">A shared workspace for ideas and code</h2>
         <p className="section-subtitle">
-          Experience the synergy: sketch system flows on the left while collaborating in real-time code on the right. 
-          Try drawing on the canvas or editing the code live below!
+          This is an interactive local preview of the workspace. Sketch on the canvas or edit sample code; open a studio room to test connected collaboration.
         </p>
       </div>
 
@@ -253,21 +249,21 @@ export default function InteractivePlayground({ onLaunchRoom }) {
           <div className="studio-tabs">
             <span className="room-indicator">
               <span className="live-dot"></span>
-              Room: <strong>#sprint-planning-alpha</strong>
+              Preview room: <strong>#sprint-planning-alpha</strong>
             </span>
-            <span className="connection-speed">⚡ 28ms ping</span>
+            <span className="connection-speed">Interactive preview</span>
           </div>
 
           <div className="active-collaborators">
-            <div className="avatar-chip avatar-alex" title="Alex (Tech Lead)">
+            <div className="avatar-chip avatar-alex" title="Sample participant">
               <span className="avatar-initials">AL</span>
-              <span className="avatar-name">Alex (Lead)</span>
+              <span className="avatar-name">Alex</span>
             </div>
-            <div className="avatar-chip avatar-sarah" title="Sarah (DevOps)">
+            <div className="avatar-chip avatar-sarah" title="Teammate preview">
               <span className="avatar-initials">SR</span>
-              <span className="avatar-name">Sarah (DevOps)</span>
+              <span className="avatar-name">Teammate preview</span>
             </div>
-            <div className="avatar-chip avatar-you" title="You (Editor)">
+            <div className="avatar-chip avatar-you" title="You in preview">
               <span className="avatar-initials">YOU</span>
             </div>
             <button 
@@ -322,7 +318,7 @@ export default function InteractivePlayground({ onLaunchRoom }) {
                   <path d="M3 3l7 18 3-7 7-3L3 3z" />
                 </svg>
                 <span className="cursor-label" style={{ backgroundColor: '#06b6d4' }}>
-                  Sarah (DevOps)
+                  Teammate preview
                 </span>
               </div>
 
@@ -351,7 +347,7 @@ export default function InteractivePlayground({ onLaunchRoom }) {
                 className={`btn-run-code ${isRunning ? 'running' : ''}`}
                 onClick={runCodeSimulation}
               >
-                {isRunning ? 'Broadcasting...' : '▶ Broadcast Test'}
+                {isRunning ? 'Broadcasting...' : '▶ Run preview'}
               </button>
             </div>
 
@@ -360,7 +356,7 @@ export default function InteractivePlayground({ onLaunchRoom }) {
               <div className="code-remote-cursor">
                 <span className="remote-cursor-line" style={{ borderColor: '#8b5cf6' }}></span>
                 <span className="remote-cursor-tag" style={{ backgroundColor: '#8b5cf6' }}>
-                  Alex is typing...
+                  Sample editor
                 </span>
               </div>
 
