@@ -354,9 +354,9 @@ export default function InteractivePlayground({ onLaunchRoom }) {
             <div className="code-editor-viewport">
               {/* Simulated remote cursor in code */}
               <div className="code-remote-cursor">
-                <span className="remote-cursor-line" style={{ borderColor: '#8b5cf6' }}></span>
-                <span className="remote-cursor-tag" style={{ backgroundColor: '#8b5cf6' }}>
-                  Sample editor
+                <span className="remote-cursor-line" style={{ borderColor: '#53C557' }}></span>
+                <span className="remote-cursor-tag" style={{ backgroundColor: '#53C557' }}>
+                  Teammate cursor
                 </span>
               </div>
 
