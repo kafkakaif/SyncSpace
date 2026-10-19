@@ -69,7 +69,7 @@ export default function InteractivePlayground({ onLaunchRoom }) {
   // Canvas State
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [brushColor, setBrushColor] = useState('#8b5cf6');
+  const [brushColor, setBrushColor] = useState('#53C557');
   const [brushWidth, setBrushWidth] = useState(3);
   const [drawnCount, setDrawnCount] = useState(0);
 
@@ -100,7 +100,7 @@ export default function InteractivePlayground({ onLaunchRoom }) {
     ctx.clearRect(0, 0, w, h);
 
     // Grid dots
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
     for (let x = 15; x < w; x += 25) {
       for (let y = 15; y < h; y += 25) {
         ctx.beginPath();
@@ -110,21 +110,21 @@ export default function InteractivePlayground({ onLaunchRoom }) {
     }
 
     // Draw Architecture diagram demo box: "API Gateway"
-    ctx.strokeStyle = '#8b5cf6';
+    ctx.strokeStyle = '#53C557';
     ctx.lineWidth = 2;
     ctx.strokeRect(30, 40, 130, 60);
-    ctx.fillStyle = 'rgba(139, 92, 246, 0.15)';
+    ctx.fillStyle = 'rgba(83, 197, 87, 0.08)';
     ctx.fillRect(30, 40, 130, 60);
-    ctx.fillStyle = '#f1f5f9';
-    ctx.font = '12px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = '#111827';
+    ctx.font = '600 12px "Lexend Deca", sans-serif';
     ctx.fillText('⚡ API Gateway', 42, 65);
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = '#5A6B5E';
     ctx.font = '10px monospace';
     ctx.fillText(':5000 / Socket.io', 42, 82);
 
     // Arrow to Service
     ctx.beginPath();
-    ctx.strokeStyle = '#38bdf8';
+    ctx.strokeStyle = '#0E9488';
     ctx.moveTo(160, 70);
     ctx.lineTo(220, 70);
     ctx.stroke();
@@ -134,25 +134,25 @@ export default function InteractivePlayground({ onLaunchRoom }) {
     ctx.moveTo(215, 65);
     ctx.lineTo(225, 70);
     ctx.lineTo(215, 75);
-    ctx.fillStyle = '#38bdf8';
+    ctx.fillStyle = '#0E9488';
     ctx.fill();
 
     // Box: "Yjs CRDT Engine"
-    ctx.strokeStyle = '#38bdf8';
+    ctx.strokeStyle = '#0E9488';
     ctx.lineWidth = 2;
     ctx.strokeRect(230, 40, 140, 60);
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+    ctx.fillStyle = 'rgba(14, 148, 136, 0.08)';
     ctx.fillRect(230, 40, 140, 60);
-    ctx.fillStyle = '#f1f5f9';
-    ctx.font = '12px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = '#111827';
+    ctx.font = '600 12px "Lexend Deca", sans-serif';
     ctx.fillText('🔄 Yjs CRDT Engine', 242, 65);
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = '#5A6B5E';
     ctx.font = '10px monospace';
     ctx.fillText('Sync & Awareness', 242, 82);
 
     // Arrow to Database
     ctx.beginPath();
-    ctx.strokeStyle = '#10b981';
+    ctx.strokeStyle = '#23964B';
     ctx.moveTo(300, 100);
     ctx.lineTo(300, 160);
     ctx.stroke();
@@ -162,18 +162,18 @@ export default function InteractivePlayground({ onLaunchRoom }) {
     ctx.moveTo(295, 155);
     ctx.lineTo(300, 165);
     ctx.lineTo(305, 155);
-    ctx.fillStyle = '#10b981';
+    ctx.fillStyle = '#23964B';
     ctx.fill();
 
-    // Cylinder: "MongoDB"
-    ctx.strokeStyle = '#10b981';
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+    // Cylinder / Box: "MongoDB"
+    ctx.strokeStyle = '#23964B';
+    ctx.fillStyle = 'rgba(35, 150, 75, 0.08)';
     ctx.strokeRect(235, 170, 130, 50);
     ctx.fillRect(235, 170, 130, 50);
-    ctx.fillStyle = '#f1f5f9';
-    ctx.font = '12px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = '#111827';
+    ctx.font = '600 12px "Lexend Deca", sans-serif';
     ctx.fillText('💾 MongoDB Store', 248, 195);
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = '#5A6B5E';
     ctx.font = '10px monospace';
     ctx.fillText('Doc Snapshots', 248, 210);
   };
@@ -286,7 +286,7 @@ export default function InteractivePlayground({ onLaunchRoom }) {
               </div>
               <div className="canvas-tools">
                 <div className="color-swatches">
-                  {['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ffffff'].map(c => (
+                  {['#53C557', '#0E9488', '#23964B', '#111827', '#EF4444'].map(c => (
                     <button
                       key={c}
                       className={`color-dot ${brushColor === c ? 'active' : ''}`}
@@ -314,10 +314,10 @@ export default function InteractivePlayground({ onLaunchRoom }) {
 
               {/* Floating simulated remote cursor */}
               <div className="simulated-cursor cursor-sarah">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="#06b6d4">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#0E9488">
                   <path d="M3 3l7 18 3-7 7-3L3 3z" />
                 </svg>
-                <span className="cursor-label" style={{ backgroundColor: '#06b6d4' }}>
+                <span className="cursor-label" style={{ backgroundColor: '#0E9488' }}>
                   Teammate preview
                 </span>
               </div>

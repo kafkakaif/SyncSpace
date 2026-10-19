@@ -38,9 +38,7 @@ export default function Footer({ onOpenWorkspace }) {
             <p className="footer-tagline">
               Turning separate engineering tools into one shared, real-time visual and code workspace.
             </p>
-            <div className="footer-track-badge">
-              Axlero Advanced MERN Engineering Track
-            </div>
+            
           </div>
 
           <div className="footer-col">

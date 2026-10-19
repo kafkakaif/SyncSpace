@@ -13,7 +13,7 @@ const ARCH_LAYERS = [
       'Socket.IO client sends and receives room-scoped collaboration events'
     ],
     tech: ['React', 'Vite', 'HTML Canvas', 'Socket.IO Client'],
-    accent: '#8b5cf6'
+    accent: '#53C557'
   },
   {
     id: 'gateway',
@@ -27,7 +27,7 @@ const ARCH_LAYERS = [
       'CORS is configured for local frontend development origins'
     ],
     tech: ['Node.js', 'Express', 'Socket.IO', 'CORS', 'Dotenv'],
-    accent: '#06b6d4'
+    accent: '#0E9488'
   },
   {
     id: 'crdt',
@@ -41,7 +41,7 @@ const ARCH_LAYERS = [
       'These capabilities should be integrated and tested before being advertised as available'
     ],
     tech: ['Planned: Yjs', 'Planned: Awareness', 'Planned: Monaco binding'],
-    accent: '#10b981'
+    accent: '#23964B'
   },
   {
     id: 'storage',
@@ -55,7 +55,7 @@ const ARCH_LAYERS = [
       'Saved snapshots could enable recovery after refresh or server restart'
     ],
     tech: ['Planned: MongoDB', 'Planned: Mongoose', 'Planned: Authentication'],
-    accent: '#f59e0b'
+    accent: '#10B981'
   }
 ];
 
@@ -84,8 +84,8 @@ export default function ArchitectureSection() {
                   className={`arch-layer-card ${isSelected ? 'active' : ''}`}
                   onClick={() => setSelectedLayerId(layer.id)}
                   style={{
-                    borderColor: isSelected ? layer.accent : 'rgba(255, 255, 255, 0.08)',
-                    boxShadow: isSelected ? `0 0 25px ${layer.accent}33` : 'none'
+                    borderColor: isSelected ? layer.accent : '#e8efe9',
+                    boxShadow: isSelected ? `0 8px 25px ${layer.accent}25` : 'none'
                   }}
                 >
                   <div className="arch-layer-header">

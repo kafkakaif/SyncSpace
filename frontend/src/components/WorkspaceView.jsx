@@ -10,7 +10,7 @@ export default function WorkspaceView({ onBackToHome, initialRoomId = '' }) {
   // Whiteboard drawing state
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [penColor, setPenColor] = useState('#8b5cf6');
+  const [penColor, setPenColor] = useState('#53C557');
   const [penWidth, setPenWidth] = useState(3);
 
   // Code editor state
@@ -78,7 +78,7 @@ collaborate("Core Engineering", ["Whiteboard", "Code Sync"]);`);
     ctx.scale(dpr, dpr);
 
     // Initial grid
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
     for (let x = 15; x < rect.width; x += 25) {
       for (let y = 15; y < rect.height; y += 25) {
         ctx.beginPath();
@@ -123,7 +123,7 @@ collaborate("Core Engineering", ["Whiteboard", "Code Sync"]);`);
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, rect.width, rect.height);
     // Redraw grid
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
     for (let x = 15; x < rect.width; x += 25) {
       for (let y = 15; y < rect.height; y += 25) {
         ctx.beginPath();
@@ -241,7 +241,7 @@ collaborate("Core Engineering", ["Whiteboard", "Code Sync"]);`);
             </div>
             <div className="ws-canvas-controls">
               <div className="palette">
-                {['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ffffff'].map(c => (
+                {['#53C557', '#0E9488', '#23964B', '#111827', '#EF4444'].map(c => (
                   <button
                     key={c}
                     className={`palette-color ${penColor === c ? 'active' : ''}`}
