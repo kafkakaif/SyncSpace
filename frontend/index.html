@@ -2,14 +2,124 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Primary SEO Meta Tags -->
     <title>SyncSpace — Real-Time Collaborative Whiteboard & Code Editor</title>
-    <meta name="description" content="SyncSpace merges an interactive whiteboard and multi-user collaborative code editor into one synchronized workspace for distributed engineering teams." />
-    <meta name="keywords" content="real-time collaboration, whiteboard, code editor, socket.io, yjs, crdt, monaco editor, system design" />
+    <meta name="title" content="SyncSpace — Real-Time Collaborative Whiteboard & Code Editor" />
+    <meta name="description" content="SyncSpace combines an interactive system design whiteboard and synchronous collaborative code editor into one real-time workspace for distributed engineering teams." />
+    <meta name="keywords" content="real-time collaboration, collaborative whiteboard, live code editor, pair programming, system design studio, socket.io rooms, yjs crdt, architecture diagrams, dev tools" />
+    <meta name="author" content="SyncSpace Team" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://syncspace.dev/" />
+    
+    <!-- Theme & Icons -->
+    <meta name="theme-color" content="#53c557" />
+    <meta name="color-scheme" content="light" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://syncspace.dev/" />
+    <meta property="og:title" content="SyncSpace — Real-Time Collaborative Whiteboard & Code Editor" />
+    <meta property="og:description" content="Think together. Build together. In Real Time. SyncSpace merges visual architecture diagramming with live concurrent code editing for modern teams." />
+    <meta property="og:site_name" content="SyncSpace" />
+    <meta property="og:image" content="https://syncspace.dev/favicon.svg" />
+    <meta property="og:image:alt" content="SyncSpace Collaborative Whiteboard and Code Editor logo" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://syncspace.dev/" />
+    <meta name="twitter:title" content="SyncSpace — Real-Time Collaborative Whiteboard & Code Editor" />
+    <meta name="twitter:description" content="Unify visual whiteboard diagramming with live concurrent code editing. Create an isolated room and start collaborating in seconds." />
+    <meta name="twitter:image" content="https://syncspace.dev/favicon.svg" />
+
+    <!-- Google Fonts Preconnect & Stylesheets -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Lexend+Deca:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Schema.org JSON-LD Structured Data for Rich Snippets -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebApplication",
+          "@id": "https://syncspace.dev/#software",
+          "name": "SyncSpace",
+          "url": "https://syncspace.dev/",
+          "applicationCategory": "DeveloperApplication",
+          "applicationSubCategory": "Collaborative Development Platform",
+          "operatingSystem": "Web Browser",
+          "description": "SyncSpace merges an interactive whiteboard and multi-user collaborative code editor into one synchronized workspace for distributed engineering teams.",
+          "featureList": [
+            "Dual-pane architecture whiteboard and concurrent code editor",
+            "Real-time Socket.IO room-scoped synchronization",
+            "Interactive low-latency system design canvas",
+            "Live multi-user code sharing and syntax preview",
+            "Zero installation web-based studio"
+          ],
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "availability": "https://schema.org/InStock"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://syncspace.dev/#organization",
+          "name": "SyncSpace",
+          "url": "https://syncspace.dev/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://syncspace.dev/favicon.svg"
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://syncspace.dev/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How does SyncSpace resolve simultaneous conflicting edits without overwriting?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The current editor broadcasts code updates to others in the same room. Conflict-free editing with Yjs CRDT is a planned next step."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can two or more browser tabs join the same room right now in Week 1?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. Open the app in two browser tabs, enter the same room ID, and join. Drawing strokes, clear events, and code updates are shared with other connected users in that room."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does room isolation work on the backend?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The backend uses Socket.IO rooms and broadcasts drawing and code events to other sockets in the selected room."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Why combine the whiteboard and code editor into one screen?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Traditional engineering discussions suffer from fragmentation between diagram tools and code editors. SyncSpace keeps architecture sketches and code implementations visually adjacent so teams can discuss and verify side-by-side."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

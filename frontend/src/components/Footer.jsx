@@ -41,7 +41,7 @@ export default function Footer({ onOpenWorkspace }) {
             
           </div>
 
-          <div className="footer-col">
+          <nav className="footer-col" aria-label="Footer Quick Links">
             <h4 className="footer-col-title">Navigation</h4>
             <ul className="footer-link-list">
               <li><a href="#features">Core Features</a></li>
@@ -49,9 +49,9 @@ export default function Footer({ onOpenWorkspace }) {
               <li><a href="#architecture">System Architecture</a></li>
               <li><a href="#faq">Frequently Asked Questions</a></li>
             </ul>
-          </div>
+          </nav>
 
-          <div className="footer-col">
+          <nav className="footer-col" aria-label="Footer Technology References">
             <h4 className="footer-col-title">Architecture & Engine</h4>
             <ul className="footer-link-list">
               <li><a href="#architecture">Socket.io Transport</a></li>
@@ -59,7 +59,7 @@ export default function Footer({ onOpenWorkspace }) {
               <li><a href="#architecture">Konva Canvas</a></li>
               <li><a href="#architecture">Monaco Code Editor</a></li>
             </ul>
-          </div>
+          </nav>
         </div>
 
         <div className="footer-bottom-row">

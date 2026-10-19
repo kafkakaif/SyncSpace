@@ -82,7 +82,16 @@ export default function ArchitectureSection() {
               <React.Fragment key={layer.id}>
                 <div
                   className={`arch-layer-card ${isSelected ? 'active' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
                   onClick={() => setSelectedLayerId(layer.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedLayerId(layer.id);
+                    }
+                  }}
                   style={{
                     borderColor: isSelected ? layer.accent : '#e8efe9',
                     boxShadow: isSelected ? `0 8px 25px ${layer.accent}25` : 'none'

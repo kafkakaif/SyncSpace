@@ -1,0 +1,16 @@
+{
+  "name": "SyncSpace — Collaborative Engineering Workspace",
+  "short_name": "SyncSpace",
+  "description": "Real-time collaborative whiteboard and code editor for distributed engineering teams.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#53c557",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -304,8 +304,10 @@ export default function InteractivePlayground({ onLaunchRoom }) {
 
             <div className="canvas-viewport-wrapper">
               <canvas
+                id="playground-canvas"
                 ref={canvasRef}
                 className="interactive-canvas"
+                aria-label="Collaborative interactive whiteboard canvas"
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
@@ -344,6 +346,7 @@ export default function InteractivePlayground({ onLaunchRoom }) {
                 ))}
               </div>
               <button 
+                id="btn-run-code-demo"
                 className={`btn-run-code ${isRunning ? 'running' : ''}`}
                 onClick={runCodeSimulation}
               >
@@ -361,9 +364,11 @@ export default function InteractivePlayground({ onLaunchRoom }) {
               </div>
 
               <textarea
+                id="playground-code-editor"
                 className="code-textarea"
                 value={codeContent}
                 onChange={(e) => setCodeContent(e.target.value)}
+                aria-label="Collaborative code editor preview"
                 spellCheck={false}
               />
             </div>

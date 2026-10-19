@@ -70,6 +70,7 @@ export default function Hero({ onJoinRoom }) {
                 value={roomIdInput}
                 onChange={(e) => setRoomIdInput(e.target.value)}
                 placeholder="Enter Room ID (e.g. system-design)"
+                aria-label="Room ID"
                 maxLength={60}
               />
               <button
