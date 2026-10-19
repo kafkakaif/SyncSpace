@@ -152,7 +152,29 @@ socket.on("code:update", (data) => {
 });
 
 const PORT = process.env.PORT || 5000;
+const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
 
-server.listen(PORT, () => {
-  console.log(`SyncSpace backend running on http://localhost:${PORT}`);
-});
+async function startServer() {
+  try {
+    if (mongoUri) {
+      await mongoose.connect(mongoUri);
+      console.log("Connected to MongoDB");
+    } else {
+      console.warn("MongoDB URI is not set; starting without a database connection.");
+    }
+
+    server.once("error", (error) => {
+      console.error(`Unable to start server: ${error.message}`);
+      process.exit(1);
+    });
+
+    server.listen(PORT, () => {
+      console.log(`SyncSpace backend running on http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("Unable to connect to MongoDB:", error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
