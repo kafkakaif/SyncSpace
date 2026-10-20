@@ -29,14 +29,26 @@ const roomDocuments = new Map();
 const roomAwareness = new Map();
 
 const MAX_YJS_UPDATE_SIZE = 1024 * 1024;
+const DEFAULT_CODE = `// Welcome to SyncSpace
+
+function collaborate() {
+  console.log("Hello, team!");
+}`;
+
 
 function getRoomDocument(roomId) {
   if (!roomDocuments.has(roomId)) {
-    roomDocuments.set(roomId, new Y.Doc());
+    const doc = new Y.Doc();
+
+    // Initialize the shared code document once per room.
+    doc.getText("code").insert(0, DEFAULT_CODE);
+
+    roomDocuments.set(roomId, doc);
   }
 
   return roomDocuments.get(roomId);
 }
+
 
 function toUpdateBuffer(update) {
   if (update instanceof Uint8Array) {

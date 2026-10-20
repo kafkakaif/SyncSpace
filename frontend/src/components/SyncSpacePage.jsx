@@ -1,5 +1,6 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import * as Y from "yjs";
 import socket from "../services/socket";
 
 const DEFAULT_CODE = `// Welcome to SyncSpace
@@ -9,6 +10,38 @@ function collaborate() {
 }`;
 
 const COLORS = ["#53C557", "#0E9488", "#23964B", "#111827", "#EF4444"];
+function toYjsUpdate(update) {
+  if (update instanceof Uint8Array) {
+    return update;
+  }
+
+  if (update instanceof ArrayBuffer) {
+    return new Uint8Array(update);
+  }
+
+  if (Array.isArray(update)) {
+    if (
+      update.every(
+        (value) =>
+          Number.isInteger(value) &&
+          value >= 0 &&
+          value <= 255
+      )
+    ) {
+      return Uint8Array.from(update);
+    }
+  }
+
+  if (
+    update &&
+    update.type === "Buffer" &&
+    Array.isArray(update.data)
+  ) {
+    return Uint8Array.from(update.data);
+  }
+
+  return null;
+}
 
 export default function SyncSpacePage({
   onBackToLanding,
@@ -21,6 +54,7 @@ export default function SyncSpacePage({
   );
   const [message, setMessage] = useState("");
   const [codeContent, setCodeContent] = useState(DEFAULT_CODE);
+  const [isCodeSynced, setIsCodeSynced] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokeColor, setStrokeColor] = useState("#53C557");
   const [hasDrawn, setHasDrawn] = useState(false);
@@ -35,7 +69,37 @@ const cursorSendTimeRef = useRef(0);
   const canvasRef = useRef(null);
   const lastPointRef = useRef(null);
   const activeRoomRef = useRef("");
+  const ydocRef = useRef(null);
+const ytextRef = useRef(null);
+const remoteYjsOriginRef = useRef({});
+const initializeYjsDocument = useCallback((joinedRoomId) => {
+  ydocRef.current?.destroy();
 
+  const doc = new Y.Doc();
+  const sharedText = doc.getText("code");
+
+  ydocRef.current = doc;
+  ytextRef.current = sharedText;
+
+  sharedText.observe(() => {
+    setCodeContent(sharedText.toString());
+  });
+
+  doc.on("update", (update, origin) => {
+    if (origin === remoteYjsOriginRef.current) {
+      return;
+    }
+
+    if (!socket.connected) {
+      return;
+    }
+
+    socket.emit("yjs:update", {
+      roomId: joinedRoomId,
+      update,
+    });
+  });
+}, []);
   useEffect(() => {
     activeRoomRef.current = activeRoom;
   }, [activeRoom]);
@@ -97,6 +161,10 @@ const announcePresence = useCallback((joinedRoomId, cursor = null) => {
       activeRoomRef.current = "";
       setParticipants([]);
       setRemoteCursors([]);
+      ydocRef.current?.destroy();
+ydocRef.current = null;
+ytextRef.current = null;
+setIsCodeSynced(false);
     };
 
     const onRoomJoined = ({ roomId: joinedRoomId } = {}) => {
@@ -109,8 +177,11 @@ const announcePresence = useCallback((joinedRoomId, cursor = null) => {
       setParticipants([]);
       setRemoteCursors([]);
       clearLocalCanvas();
-      setCodeContent(DEFAULT_CODE);
-      announcePresence(joinedRoomId);
+      setCodeContent("");
+setIsCodeSynced(false);
+
+initializeYjsDocument(joinedRoomId);
+announcePresence(joinedRoomId);
     };
 
     const onRoomLeft = ({ roomId: leftRoomId } = {}) => {
@@ -148,7 +219,12 @@ const announcePresence = useCallback((joinedRoomId, cursor = null) => {
       socket.off("room-left", onRoomLeft);
       socket.off("room-error", onRoomError);
     };
-  }, [initialRoomId, clearLocalCanvas, announcePresence]);
+  }, [
+  initialRoomId,
+  clearLocalCanvas,
+  announcePresence,
+  initializeYjsDocument,
+]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -193,15 +269,36 @@ const announcePresence = useCallback((joinedRoomId, cursor = null) => {
       }
     };
 
-    const onCodeUpdate = (data) => {
-      if (
-        data &&
-        data.roomId === activeRoomRef.current &&
-        typeof data.code === "string"
-      ) {
-        setCodeContent(data.code);
-      }
-    };
+    const applyYjsUpdate = (data, initialSync = false) => {
+  if (!data || data.roomId !== activeRoomRef.current) {
+    return;
+  }
+
+  const doc = ydocRef.current;
+  const update = toYjsUpdate(data.update);
+
+  if (!doc || !update) {
+    return;
+  }
+
+  try {
+    Y.applyUpdate(doc, update, remoteYjsOriginRef.current);
+
+    if (initialSync) {
+      setIsCodeSynced(true);
+    }
+  } catch {
+    setMessage("Unable to synchronize the shared code document.");
+  }
+};
+
+const onYjsSync = (data) => {
+  applyYjsUpdate(data, true);
+};
+
+const onYjsUpdate = (data) => {
+  applyYjsUpdate(data);
+};
 
     const onAwarenessChanged = (data) => {
       if (!data || data.roomId !== activeRoomRef.current) return;
@@ -226,13 +323,15 @@ setRemoteCursors(nextRemoteCursors);
 
     socket.on("whiteboard:segment", onRemoteSegment);
     socket.on("whiteboard:clear", onRemoteClear);
-    socket.on("code:update", onCodeUpdate);
+    socket.on("yjs:sync", onYjsSync);
+socket.on("yjs:update", onYjsUpdate);
     socket.on("awareness:changed", onAwarenessChanged);
 
     return () => {
       socket.off("whiteboard:segment", onRemoteSegment);
       socket.off("whiteboard:clear", onRemoteClear);
-      socket.off("code:update", onCodeUpdate);
+      socket.off("yjs:sync", onYjsSync);
+socket.off("yjs:update", onYjsUpdate);
       socket.off("awareness:changed", onAwarenessChanged);
     };
   }, [clearLocalCanvas]);
@@ -377,17 +476,66 @@ const handleCanvasPointerLeave = () => {
 
     socket.emit("join-room", quickRoomId);
   };
+const updateCode = (updatedCode) => {
+  const doc = ydocRef.current;
+  const sharedText = ytextRef.current;
 
-  const updateCode = (updatedCode) => {
-    setCodeContent(updatedCode);
+  if (
+    !activeRoom ||
+    !socket.connected ||
+    !isCodeSynced ||
+    !doc ||
+    !sharedText
+  ) {
+    return;
+  }
 
-    if (activeRoom && socket.connected) {
-      socket.emit("code:update", {
-        roomId: activeRoom,
-        code: updatedCode,
-      });
+  const currentCode = sharedText.toString();
+
+  if (currentCode === updatedCode) {
+    return;
+  }
+
+  // Find the unchanged beginning of the text.
+  let prefix = 0;
+
+  while (
+    prefix < currentCode.length &&
+    prefix < updatedCode.length &&
+    currentCode[prefix] === updatedCode[prefix]
+  ) {
+    prefix++;
+  }
+
+  // Find the unchanged ending of the text.
+  let oldEnd = currentCode.length;
+  let newEnd = updatedCode.length;
+
+  while (
+    oldEnd > prefix &&
+    newEnd > prefix &&
+    currentCode[oldEnd - 1] === updatedCode[newEnd - 1]
+  ) {
+    oldEnd--;
+    newEnd--;
+  }
+
+  // Apply only the changed section to the shared Yjs text.
+  doc.transact(() => {
+    const deleteLength = oldEnd - prefix;
+
+    if (deleteLength > 0) {
+      sharedText.delete(prefix, deleteLength);
     }
-  };
+
+    const insertedText = updatedCode.slice(prefix, newEnd);
+
+    if (insertedText.length > 0) {
+      sharedText.insert(prefix, insertedText);
+    }
+  });
+};
+
 
   return (
     <div className="syncspace-page-wrapper">
@@ -673,6 +821,7 @@ transform: "translate(-2px, -2px)",
                 value={codeContent}
                 onChange={(event) => updateCode(event.target.value)}
                 spellCheck={false}
+                disabled={!activeRoom || !isCodeSynced}
                 placeholder="Join a room and start writing code..."
                 className="syncspace-code-editor"
               />
