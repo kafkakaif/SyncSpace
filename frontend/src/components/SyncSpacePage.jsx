@@ -13,7 +13,7 @@ function collaborate() {
   console.log("Hello, team!");
 }`;
 
-const COLORS = ["#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ffffff"];
+const COLORS = ["#53C557", "#0E9488", "#23964B", "#111827", "#EF4444"];
 
 export default function SyncSpacePage({
   onBackToLanding,
@@ -25,7 +25,7 @@ export default function SyncSpacePage({
   const [message, setMessage] = useState("");
   const [codeContent, setCodeContent] = useState(DEFAULT_CODE);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [strokeColor, setStrokeColor] = useState("#8b5cf6");
+  const [strokeColor, setStrokeColor] = useState("#53C557");
   const [hasDrawn, setHasDrawn] = useState(false);
 
   const canvasRef = useRef(null);
@@ -37,7 +37,7 @@ export default function SyncSpacePage({
   }, [activeRoom]);
 
   const drawGrid = useCallback((ctx, width, height) => {
-    ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
     for (let x = 15; x < width; x += 25) {
       for (let y = 15; y < height; y += 25) {
         ctx.beginPath();

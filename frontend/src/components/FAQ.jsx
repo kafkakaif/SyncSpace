@@ -49,10 +49,12 @@ export default function FAQ() {
                 className="faq-question-btn"
                 onClick={() => toggleFAQ(idx)}
                 aria-expanded={isOpen}
+                aria-controls={`faq-answer-${idx}`}
+                id={`faq-question-${idx}`}
               >
                 <span className="faq-question-text">{item.q}</span>
                 <span className="faq-toggle-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                     {isOpen ? (
                       <path strokeLinecap="round" strokeLinejoin="round" d="M18 12H6" />
                     ) : (
@@ -62,7 +64,12 @@ export default function FAQ() {
                 </span>
               </button>
               {isOpen && (
-                <div className="faq-answer-pane">
+                <div 
+                  id={`faq-answer-${idx}`} 
+                  className="faq-answer-pane"
+                  role="region"
+                  aria-labelledby={`faq-question-${idx}`}
+                >
                   <p className="faq-answer-text">{item.a}</p>
                 </div>
               )}

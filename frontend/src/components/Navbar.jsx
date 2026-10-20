@@ -15,9 +15,9 @@ export default function Navbar({ onOpenWorkspace }) {
   return (
     <header className={`navbar-header ${scrolled ? 'scrolled' : ''}`}>
       <div className="navbar-container">
-        <a href="#" className="navbar-brand">
+        <a href="#" className="navbar-brand" aria-label="SyncSpace Home">
           <div className="brand-logo-glow">
-            <svg className="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
             </svg>
           </div>
@@ -25,7 +25,7 @@ export default function Navbar({ onOpenWorkspace }) {
         </a>
 
         {/* Desktop Nav Links */}
-        <nav className="nav-links">
+        <nav className="nav-links" aria-label="Main Navigation">
           <a href="#features" className="nav-link">Features</a>
           <a href="#playground" className="nav-link">Live Demo</a>
           <a href="#architecture" className="nav-link">Architecture</a>

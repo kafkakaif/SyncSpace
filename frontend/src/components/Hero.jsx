@@ -29,8 +29,8 @@ export default function Hero({ onJoinRoom }) {
   return (
     <section className="hero-section">
       {/* Background radial spotlights */}
-      <div className="hero-glow-blob hero-glow-purple"></div>
-      <div className="hero-glow-blob hero-glow-cyan"></div>
+      <div className="hero-glow-blob hero-glow-green"></div>
+      <div className="hero-glow-blob hero-glow-teal"></div>
 
       <div className="hero-content">
         {/* Release Pill */}
@@ -70,6 +70,7 @@ export default function Hero({ onJoinRoom }) {
                 value={roomIdInput}
                 onChange={(e) => setRoomIdInput(e.target.value)}
                 placeholder="Enter Room ID (e.g. system-design)"
+                aria-label="Room ID"
                 maxLength={60}
               />
               <button
