@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import socket from "../services/socket";
+const [codeContent, setCodeContent] = useState(DEFAULT_CODE);
+const [isDrawing, setIsDrawing] = useState(false);
 
+const [displayName, setDisplayName] = useState(
+  () => `User-${Math.random().toString(36).slice(2, 6)}`
+);
+const [participants, setParticipants] = useState([]);
 const DEFAULT_CODE = `// Welcome to SyncSpace
 
 function collaborate() {
@@ -67,6 +73,7 @@ export default function SyncSpacePage({
     const onRoomJoined = ({ roomId: joinedRoomId } = {}) => {
       if (typeof joinedRoomId !== "string") return;
       setActiveRoom(joinedRoomId);
+      announcePresence(joinedRoomId);
       activeRoomRef.current = joinedRoomId;
       setRoomId(joinedRoomId);
       setMessage(`Successfully joined room: ${joinedRoomId}`);
@@ -154,15 +161,24 @@ export default function SyncSpacePage({
         setCodeContent(data.code);
       }
     };
+    const onAwarenessChanged = (data) => {
+  if (!data || data.roomId !== activeRoomRef.current) return;
+
+  setParticipants(
+    Array.isArray(data.participants) ? data.participants : []
+  );
+};
 
     socket.on("whiteboard:segment", onRemoteSegment);
     socket.on("whiteboard:clear", onRemoteClear);
     socket.on("code:update", onCodeUpdate);
+    socket.on("awareness:changed", onAwarenessChanged);
 
     return () => {
       socket.off("whiteboard:segment", onRemoteSegment);
       socket.off("whiteboard:clear", onRemoteClear);
       socket.off("code:update", onCodeUpdate);
+      socket.off("awareness:changed", onAwarenessChanged);
     };
   }, [clearLocalCanvas]);
 
@@ -253,7 +269,14 @@ export default function SyncSpacePage({
   const leaveRoom = () => {
     if (activeRoom && socket.connected) socket.emit("leave-room", activeRoom);
   };
+  const announcePresence = (joinedRoomId) => {
+  if (!joinedRoomId || !socket.connected) return;
 
+  socket.emit("awareness:update", {
+    roomId: joinedRoomId,
+    name: displayName,
+  });
+};
   const joinQuickRoom = (quickRoomId) => {
     setRoomId(quickRoomId);
     if (!socket.connected) {
