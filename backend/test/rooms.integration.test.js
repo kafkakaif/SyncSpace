@@ -163,7 +163,19 @@ test("room members receive shared Yjs updates and awareness", async () => {
     name: "Asha",
     cursor: { x: 120, y: 80 },
   });
-  assert.equal((await awareness).participants.length, 1);
+  const awarenessData = await awareness;
+
+assert.equal(awarenessData.participants.length, 2);
+
+assert.ok(
+  awarenessData.participants.some(
+    (participant) =>
+      participant.name === "Asha" &&
+      participant.cursor?.x === 120 &&
+      participant.cursor?.y === 80
+  ),
+  "Asha should appear with the correct cursor coordinates"
+);
 });
 
 test("team-room events never reach a user in private-room", async () => {

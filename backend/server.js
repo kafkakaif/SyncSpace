@@ -10,52 +10,94 @@ import "dotenv/config";
 const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = ["http://localhost:3000", "http://localhost:5173"];
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+];
 
-app.use(cors({
-  origin: allowedOrigins
-}));
-
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
 const roomDocuments = new Map();
 const roomAwareness = new Map();
+
 const MAX_YJS_UPDATE_SIZE = 1024 * 1024;
 
 function getRoomDocument(roomId) {
   if (!roomDocuments.has(roomId)) {
     roomDocuments.set(roomId, new Y.Doc());
   }
+
   return roomDocuments.get(roomId);
 }
 
 function toUpdateBuffer(update) {
-  if (update instanceof Uint8Array) return update;
-  if (update instanceof ArrayBuffer) return new Uint8Array(update);
-  if (Array.isArray(update) && update.every((value) => Number.isInteger(value) && value >= 0 && value <= 255)) {
+  if (update instanceof Uint8Array) {
+    return update;
+  }
+
+  if (update instanceof ArrayBuffer) {
+    return new Uint8Array(update);
+  }
+
+  if (
+    Array.isArray(update) &&
+    update.every(
+      (value) =>
+        Number.isInteger(value) &&
+        value >= 0 &&
+        value <= 255
+    )
+  ) {
     return Uint8Array.from(update);
   }
+
   return null;
 }
 
-// Health-check endpoint
+function getParticipants(roomId) {
+  return [...(roomAwareness.get(roomId)?.values() || [])];
+}
+
+function broadcastAwareness(roomId) {
+  io.to(roomId).emit("awareness:changed", {
+    roomId,
+    participants: getParticipants(roomId),
+  });
+}
+
+function removeAwareness(socket, roomId) {
+  const awareness = roomAwareness.get(roomId);
+
+  if (!awareness || !awareness.delete(socket.id)) {
+    return;
+  }
+
+  if (awareness.size === 0) {
+    roomAwareness.delete(roomId);
+  }
+
+  broadcastAwareness(roomId);
+}
+
 app.get("/health", (req, res) => {
   res.json({
     status: "success",
-    message: "SyncSpace backend is running!"
+    message: "SyncSpace backend is running!",
   });
 });
 
-// Socket.io connection
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
+
+  let displayName = `User-${socket.id.slice(0, 4)}`;
 
   const sendDocumentState = (roomId) => {
     socket.emit("yjs:sync", {
@@ -64,123 +106,162 @@ io.on("connection", (socket) => {
     });
   };
 
-  const broadcastAwareness = (roomId) => {
-    const participants = [...(roomAwareness.get(roomId)?.values() || [])];
-    io.to(roomId).emit("awareness:changed", { roomId, participants });
-  };
-
-  const removeAwareness = (roomId) => {
-    const awareness = roomAwareness.get(roomId);
-    if (!awareness || !awareness.delete(socket.id)) return;
-    if (awareness.size === 0) roomAwareness.delete(roomId);
-    broadcastAwareness(roomId);
-  };
-
   const leaveApplicationRooms = () => {
-    for (const room of socket.rooms) {
-      if (room !== socket.id) {
-        removeAwareness(room);
-        socket.leave(room);
+    for (const roomId of [...socket.rooms]) {
+      if (roomId === socket.id) {
+        continue;
       }
+
+      removeAwareness(socket, roomId);
+      socket.leave(roomId);
     }
   };
 
+  const joinRoom = (roomId, acknowledge, created = false) => {
+    if (
+      typeof roomId !== "string" ||
+      roomId.trim().length === 0 ||
+      roomId.trim().length > 100
+    ) {
+      const result = {
+        ok: false,
+        message: "Please provide a valid room ID.",
+      };
 
+      socket.emit("room-error", {
+        message: result.message,
+      });
 
-socket.on("join-room", (roomId, acknowledge) => {
-  if (
-    typeof roomId !== "string" ||
-    roomId.trim().length === 0 ||
-    roomId.trim().length > 100
-  ) {
-    socket.emit("room-error", {
-      message: "Please provide a valid room ID.",
-    });
-    if (typeof acknowledge === "function") {
-      acknowledge({ ok: false, message: "Please provide a valid room ID." });
-    }
-    return;
-  }
+      if (typeof acknowledge === "function") {
+        acknowledge(result);
+      }
 
-  const cleanRoomId = roomId.trim();
-
-  leaveApplicationRooms();
-
-  socket.join(cleanRoomId);
-  getRoomDocument(cleanRoomId);
-
-  socket.emit("room-joined", {
-    roomId: cleanRoomId,
-  });
-
-  console.log(`${socket.id} joined room: ${cleanRoomId}`);
-  sendDocumentState(cleanRoomId);
-  socket.emit("awareness:changed", {
-    roomId: cleanRoomId,
-    participants: [...(roomAwareness.get(cleanRoomId)?.values() || [])],
-  });
-  if (typeof acknowledge === "function") {
-    acknowledge({ ok: true, roomId: cleanRoomId });
-  }
-});
-
-socket.on("create-room", (roomId, acknowledge) => {
-  if (
-    typeof roomId !== "string" ||
-    roomId.trim().length === 0 ||
-    roomId.trim().length > 100
-  ) {
-    const result = { ok: false, message: "Please provide a valid room ID." };
-    socket.emit("room-error", { message: result.message });
-    if (typeof acknowledge === "function") acknowledge(result);
-    return;
-  }
-
-  const cleanRoomId = roomId.trim();
-  leaveApplicationRooms();
-
-  socket.join(cleanRoomId);
-  getRoomDocument(cleanRoomId);
-  const result = { ok: true, roomId: cleanRoomId };
-  socket.emit("room-joined", { roomId: cleanRoomId });
-  socket.emit("room-created", { roomId: cleanRoomId });
-  sendDocumentState(cleanRoomId);
-  socket.emit("awareness:changed", {
-    roomId: cleanRoomId,
-    participants: [...(roomAwareness.get(cleanRoomId)?.values() || [])],
-  });
-  if (typeof acknowledge === "function") acknowledge(result);
-  console.log(`${socket.id} created room: ${cleanRoomId}`);
-});
-
-
-
-  socket.on("leave-room", (roomId, acknowledge) => {
-    if (typeof roomId !== "string" || !socket.rooms.has(roomId)) {
-      const result = { ok: false, message: "You are not in that room." };
-      socket.emit("room-error", { message: result.message });
-      if (typeof acknowledge === "function") acknowledge(result);
       return;
     }
 
-    socket.leave(roomId);
-    removeAwareness(roomId);
-    socket.emit("room-left", { roomId });
+    const cleanRoomId = roomId.trim();
 
-    console.log(`${socket.id} left room: ${roomId}`);
-    if (typeof acknowledge === "function") acknowledge({ ok: true, roomId });
+    // Preserve presence when the user is already in this room.
+    if (socket.rooms.has(cleanRoomId)) {
+      const result = {
+        ok: true,
+        roomId: cleanRoomId,
+      };
+
+      if (typeof acknowledge === "function") {
+        acknowledge(result);
+      }
+
+      return;
+    }
+
+    leaveApplicationRooms();
+
+    socket.join(cleanRoomId);
+    getRoomDocument(cleanRoomId);
+
+    socket.emit("room-joined", {
+      roomId: cleanRoomId,
+    });
+
+    if (created) {
+      socket.emit("room-created", {
+        roomId: cleanRoomId,
+      });
+    }
+
+    console.log(`${socket.id} joined room: ${cleanRoomId}`);
+
+    sendDocumentState(cleanRoomId);
+
+    // Register the participant when they enter the room.
+    if (!roomAwareness.has(cleanRoomId)) {
+      roomAwareness.set(cleanRoomId, new Map());
+    }
+
+    roomAwareness.get(cleanRoomId).set(socket.id, {
+      socketId: socket.id,
+      name: displayName,
+      cursor: null,
+    });
+
+    broadcastAwareness(cleanRoomId);
+
+    if (typeof acknowledge === "function") {
+      acknowledge({
+        ok: true,
+        roomId: cleanRoomId,
+      });
+    }
+  };
+
+  socket.on("join-room", (roomId, acknowledge) => {
+    joinRoom(roomId, acknowledge);
   });
 
+  socket.on("create-room", (roomId, acknowledge) => {
+    joinRoom(roomId, acknowledge, true);
+  });
+
+  socket.on("leave-room", (roomId, acknowledge) => {
+    if (
+      typeof roomId !== "string" ||
+      !socket.rooms.has(roomId)
+    ) {
+      const result = {
+        ok: false,
+        message: "You are not in that room.",
+      };
+
+      socket.emit("room-error", {
+        message: result.message,
+      });
+
+      if (typeof acknowledge === "function") {
+        acknowledge(result);
+      }
+
+      return;
+    }
+
+    removeAwareness(socket, roomId);
+    socket.leave(roomId);
+
+    socket.emit("room-left", {
+      roomId,
+    });
+
+    console.log(`${socket.id} left room: ${roomId}`);
+
+    if (typeof acknowledge === "function") {
+      acknowledge({
+        ok: true,
+        roomId,
+      });
+    }
+  });
+
+  // Send the current shared Yjs document to this client.
   socket.on("yjs:sync-request", (roomId) => {
-    if (typeof roomId !== "string" || !socket.rooms.has(roomId)) return;
+    if (
+      typeof roomId !== "string" ||
+      !socket.rooms.has(roomId)
+    ) {
+      return;
+    }
+
     sendDocumentState(roomId);
   });
 
+  // Apply and broadcast valid Yjs document updates.
   socket.on("yjs:update", (data) => {
-    if (!data || typeof data !== "object") return;
+    if (!data || typeof data !== "object") {
+      return;
+    }
 
     const { roomId } = data;
     const update = toUpdateBuffer(data.update);
+
     if (
       typeof roomId !== "string" ||
       !socket.rooms.has(roomId) ||
@@ -193,16 +274,26 @@ socket.on("create-room", (roomId, acknowledge) => {
 
     try {
       Y.applyUpdate(getRoomDocument(roomId), update);
-      socket.to(roomId).emit("yjs:update", { roomId, update });
+
+      socket.to(roomId).emit("yjs:update", {
+        roomId,
+        update,
+      });
     } catch {
-      socket.emit("room-error", { message: "Unable to apply the shared document update." });
+      socket.emit("room-error", {
+        message: "Unable to apply the shared document update.",
+      });
     }
   });
 
+  // Update participant names and remote cursor coordinates.
   socket.on("awareness:update", (data) => {
-    if (!data || typeof data !== "object") return;
+    if (!data || typeof data !== "object") {
+      return;
+    }
 
     const { roomId, name, cursor } = data;
+
     if (
       typeof roomId !== "string" ||
       !socket.rooms.has(roomId) ||
@@ -215,31 +306,50 @@ socket.on("create-room", (roomId, acknowledge) => {
 
     const hasValidCursor =
       cursor === undefined ||
-      (cursor &&
+      cursor === null ||
+      (
         typeof cursor === "object" &&
         Number.isFinite(cursor.x) &&
         Number.isFinite(cursor.y) &&
         Math.abs(cursor.x) <= 10000 &&
-        Math.abs(cursor.y) <= 10000);
-    if (!hasValidCursor) return;
+        Math.abs(cursor.y) <= 10000
+      );
 
-    if (!roomAwareness.has(roomId)) roomAwareness.set(roomId, new Map());
+    if (!hasValidCursor) {
+      return;
+    }
+
+    displayName = name.trim();
+
+    if (!roomAwareness.has(roomId)) {
+      roomAwareness.set(roomId, new Map());
+    }
+
     roomAwareness.get(roomId).set(socket.id, {
       socketId: socket.id,
-      name: name.trim(),
-      cursor: cursor ? { x: cursor.x, y: cursor.y } : null,
+      name: displayName,
+      cursor:
+        cursor &&
+        Number.isFinite(cursor.x) &&
+        Number.isFinite(cursor.y)
+          ? {
+              x: cursor.x,
+              y: cursor.y,
+            }
+          : null,
     });
+
     broadcastAwareness(roomId);
   });
 
-  
-  // Real-time whiteboard drawing
+  // Broadcast whiteboard drawing segments to other room members.
   socket.on("whiteboard:segment", (data) => {
-    if (!data || typeof data !== "object") return;
+    if (!data || typeof data !== "object") {
+      return;
+    }
 
     const { roomId, x1, y1, x2, y2, color } = data;
 
-    // Only allow drawing in a room this socket has joined
     if (
       typeof roomId !== "string" ||
       !socket.rooms.has(roomId) ||
@@ -255,7 +365,6 @@ socket.on("create-room", (roomId, acknowledge) => {
       return;
     }
 
-    // Broadcast to other users in this room, not the sender
     socket.to(roomId).emit("whiteboard:segment", {
       roomId,
       x1,
@@ -266,7 +375,7 @@ socket.on("create-room", (roomId, acknowledge) => {
     });
   });
 
-  // Clear the shared whiteboard
+  // Clear the whiteboard for other room members.
   socket.on("whiteboard:clear", (roomId) => {
     if (
       typeof roomId !== "string" ||
@@ -277,31 +386,36 @@ socket.on("create-room", (roomId, acknowledge) => {
 
     socket.to(roomId).emit("whiteboard:clear", roomId);
   });
-  
-socket.on("code:update", (data) => {
-  if (!data || typeof data !== "object") return;
 
-  const { roomId, code } = data;
+  // Keep the current code editor synchronization behavior.
+  socket.on("code:update", (data) => {
+    if (!data || typeof data !== "object") {
+      return;
+    }
 
-  if (
-    typeof roomId !== "string" ||
-    !socket.rooms.has(roomId) ||
-    typeof code !== "string" ||
-    code.length > 100000
-  ) {
-    return;
-  }
+    const { roomId, code } = data;
 
-  // Share code with other users in the same room
-  socket.to(roomId).emit("code:update", {
-    roomId,
-    code,
+    if (
+      typeof roomId !== "string" ||
+      !socket.rooms.has(roomId) ||
+      typeof code !== "string" ||
+      code.length > 100000
+    ) {
+      return;
+    }
+
+    socket.to(roomId).emit("code:update", {
+      roomId,
+      code,
+    });
   });
-});
 
+  // Remove participant awareness when the socket leaves a room.
   socket.on("disconnecting", () => {
-    for (const room of socket.rooms) {
-      if (room !== socket.id) removeAwareness(room);
+    for (const roomId of [...socket.rooms]) {
+      if (roomId !== socket.id) {
+        removeAwareness(socket, roomId);
+      }
     }
   });
 
@@ -319,7 +433,9 @@ async function startServer() {
       await mongoose.connect(mongoUri);
       console.log("Connected to MongoDB");
     } else {
-      console.warn("MongoDB URI is not set; starting without a database connection.");
+      console.warn(
+        "MongoDB URI is not set; starting without a database connection."
+      );
     }
 
     server.once("error", (error) => {
@@ -328,10 +444,15 @@ async function startServer() {
     });
 
     server.listen(PORT, () => {
-      console.log(`SyncSpace backend running on http://localhost:${PORT}`);
+      console.log(
+        `SyncSpace backend running on http://localhost:${PORT}`
+      );
     });
   } catch (error) {
-    console.error("Unable to connect to MongoDB:", error.message);
+    console.error(
+      "Unable to connect to MongoDB:",
+      error.message
+    );
     process.exit(1);
   }
 }

@@ -29,6 +29,8 @@ export default function SyncSpacePage({
     () => `User-${Math.random().toString(36).slice(2, 6)}`
   );
   const [participants, setParticipants] = useState([]);
+  const [remoteCursors, setRemoteCursors] = useState([]);
+const cursorSendTimeRef = useRef(0);
 
   const canvasRef = useRef(null);
   const lastPointRef = useRef(null);
@@ -63,17 +65,22 @@ export default function SyncSpacePage({
     setHasDrawn(false);
   }, [drawGrid]);
 
-  const announcePresence = useCallback(
-    (joinedRoomId) => {
-      if (!joinedRoomId || !socket.connected) return;
 
-      socket.emit("awareness:update", {
-        roomId: joinedRoomId,
-        name: displayName,
-      });
-    },
-    [displayName]
-  );
+
+const announcePresence = useCallback((joinedRoomId, cursor = null) => {
+  if (!joinedRoomId || !socket.connected) return;
+
+  const payload = {
+    roomId: joinedRoomId,
+    name: displayName,
+    cursor,
+  };
+
+
+  socket.emit("awareness:update", payload);
+}, [displayName]);
+
+
 
   useEffect(() => {
     const onConnect = () => {
@@ -89,6 +96,7 @@ export default function SyncSpacePage({
       setActiveRoom("");
       activeRoomRef.current = "";
       setParticipants([]);
+      setRemoteCursors([]);
     };
 
     const onRoomJoined = ({ roomId: joinedRoomId } = {}) => {
@@ -99,9 +107,9 @@ export default function SyncSpacePage({
       setRoomId(joinedRoomId);
       setMessage(`Successfully joined room: ${joinedRoomId}`);
       setParticipants([]);
+      setRemoteCursors([]);
       clearLocalCanvas();
       setCodeContent(DEFAULT_CODE);
-
       announcePresence(joinedRoomId);
     };
 
@@ -110,6 +118,7 @@ export default function SyncSpacePage({
         activeRoomRef.current = "";
         setActiveRoom("");
         setParticipants([]);
+        setRemoteCursors([]);
       }
 
       setMessage(`Left room: ${leftRoomId}`);
@@ -197,10 +206,23 @@ export default function SyncSpacePage({
     const onAwarenessChanged = (data) => {
       if (!data || data.roomId !== activeRoomRef.current) return;
 
-      setParticipants(
-        Array.isArray(data.participants) ? data.participants : []
-      );
-    };
+  const nextParticipants = Array.isArray(data.participants)
+    ? data.participants
+    : [];
+
+  setParticipants(nextParticipants);
+
+  const nextRemoteCursors = nextParticipants.filter(
+  (participant) =>
+    participant.socketId !== socket.id &&
+    participant.cursor &&
+    Number.isFinite(participant.cursor.x) &&
+    Number.isFinite(participant.cursor.y)
+);
+
+
+setRemoteCursors(nextRemoteCursors);
+};
 
     socket.on("whiteboard:segment", onRemoteSegment);
     socket.on("whiteboard:clear", onRemoteClear);
@@ -214,6 +236,29 @@ export default function SyncSpacePage({
       socket.off("awareness:changed", onAwarenessChanged);
     };
   }, [clearLocalCanvas]);
+
+
+const handleCanvasPointerMove = (event) => {
+  if (!activeRoom || !socket.connected) return;
+
+  const now = Date.now();
+  if (now - cursorSendTimeRef.current < 50) return;
+  cursorSendTimeRef.current = now;
+
+  const canvas = canvasRef.current;
+  if (!canvas) return;
+
+  const rect = canvas.getBoundingClientRect();
+
+  const cursor = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  };
+
+
+  announcePresence(activeRoom, cursor);
+};
+
 
   const startDrawing = (event) => {
     if (!activeRoom || !socket.connected) {
@@ -286,6 +331,11 @@ export default function SyncSpacePage({
     setIsDrawing(false);
     lastPointRef.current = null;
   };
+
+const handleCanvasPointerLeave = () => {
+  stopDrawing();
+};
+
 
   const clearCanvas = () => {
     clearLocalCanvas();
@@ -529,25 +579,81 @@ export default function SyncSpacePage({
               </div>
             </div>
 
-            <div className="canvas-container-box">
-              <canvas
-                ref={canvasRef}
-                className="synced-canvas-element"
-                onPointerDown={startDrawing}
-                onPointerMove={draw}
-                onPointerUp={stopDrawing}
-                onPointerCancel={stopDrawing}
-                onPointerLeave={stopDrawing}
-                style={{ touchAction: "none" }}
-                aria-label="Collaborative whiteboard canvas"
-              />
 
-              <div className="placeholder">
-                <span className="placeholder-icon">✏️</span>
-                <h3>Collaborative Canvas</h3>
-                <p>Join a room, then click and drag to draw with your team.</p>
-              </div>
-            </div>
+<div className="canvas-container-box" style={{ position: "relative" }}>
+  <canvas
+    ref={canvasRef}
+    className="synced-canvas-element"
+    onPointerDown={startDrawing}
+    onPointerMove={(event) => {
+      handleCanvasPointerMove(event);
+      draw(event);
+    }}
+    onPointerUp={stopDrawing}
+    onPointerCancel={stopDrawing}
+    onPointerLeave={handleCanvasPointerLeave}
+    style={{ touchAction: "none", cursor: "default" }}
+    aria-label="Collaborative whiteboard canvas"
+  />
+
+  {remoteCursors.map((participant, index) => {
+    const cursor = participant.cursor;
+    if (!cursor) return null;
+
+    const color = COLORS[index % COLORS.length];
+
+    return (
+      <div
+        key={participant.socketId}
+        style={{
+          position: "absolute",
+          left: cursor.x,
+          top: cursor.y,
+          zIndex: 9999,
+pointerEvents: "none",
+transform: "translate(-2px, -2px)",
+        }}
+      >
+        <svg
+          width="18"
+          height="22"
+          viewBox="0 0 18 22"
+          aria-hidden="true"
+        >
+          <path
+            d="M1 1 L1 17 L5.5 12.5 L9 20 L12 18.5 L9 11 L16 11 Z"
+            fill={color}
+            stroke="#ffffff"
+            strokeWidth="1.2"
+          />
+        </svg>
+
+        <span
+          style={{
+            display: "inline-block",
+            marginLeft: "4px",
+            padding: "3px 6px",
+            borderRadius: "4px",
+            background: color,
+            color: "#ffffff",
+            fontSize: "11px",
+            fontWeight: 600,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {participant.name}
+        </span>
+      </div>
+    );
+  })}
+
+  <div className="placeholder">
+    <span className="placeholder-icon">✏️</span>
+    <h3>Collaborative Canvas</h3>
+    <p>Join a room, then click and drag to draw with your team.</p>
+  </div>
+</div>
+
           </div>
 
           <div className="panel">
