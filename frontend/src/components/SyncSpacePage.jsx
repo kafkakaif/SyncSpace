@@ -1,12 +1,7 @@
+
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import socket from "../services/socket";
-const [codeContent, setCodeContent] = useState(DEFAULT_CODE);
-const [isDrawing, setIsDrawing] = useState(false);
 
-const [displayName, setDisplayName] = useState(
-  () => `User-${Math.random().toString(36).slice(2, 6)}`
-);
-const [participants, setParticipants] = useState([]);
 const DEFAULT_CODE = `// Welcome to SyncSpace
 
 function collaborate() {
@@ -21,12 +16,19 @@ export default function SyncSpacePage({
 }) {
   const [roomId, setRoomId] = useState(initialRoomId);
   const [activeRoom, setActiveRoom] = useState("");
-  const [status, setStatus] = useState(socket.connected ? "Connected" : "Disconnected");
+  const [status, setStatus] = useState(
+    socket.connected ? "Connected" : "Disconnected"
+  );
   const [message, setMessage] = useState("");
   const [codeContent, setCodeContent] = useState(DEFAULT_CODE);
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokeColor, setStrokeColor] = useState("#53C557");
   const [hasDrawn, setHasDrawn] = useState(false);
+
+  const [displayName] = useState(
+    () => `User-${Math.random().toString(36).slice(2, 6)}`
+  );
+  const [participants, setParticipants] = useState([]);
 
   const canvasRef = useRef(null);
   const lastPointRef = useRef(null);
@@ -38,6 +40,7 @@ export default function SyncSpacePage({
 
   const drawGrid = useCallback((ctx, width, height) => {
     ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
+
     for (let x = 15; x < width; x += 25) {
       for (let y = 15; y < height; y += 25) {
         ctx.beginPath();
@@ -50,43 +53,65 @@ export default function SyncSpacePage({
   const clearLocalCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
     const rect = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
     drawGrid(ctx, rect.width, rect.height);
     setHasDrawn(false);
   }, [drawGrid]);
 
+  const announcePresence = useCallback(
+    (joinedRoomId) => {
+      if (!joinedRoomId || !socket.connected) return;
+
+      socket.emit("awareness:update", {
+        roomId: joinedRoomId,
+        name: displayName,
+      });
+    },
+    [displayName]
+  );
+
   useEffect(() => {
     const onConnect = () => {
       setStatus("Connected");
-      if (initialRoomId?.trim()) socket.emit("join-room", initialRoomId.trim());
+
+      if (initialRoomId?.trim()) {
+        socket.emit("join-room", initialRoomId.trim());
+      }
     };
 
     const onDisconnect = () => {
       setStatus("Disconnected");
       setActiveRoom("");
       activeRoomRef.current = "";
+      setParticipants([]);
     };
 
     const onRoomJoined = ({ roomId: joinedRoomId } = {}) => {
       if (typeof joinedRoomId !== "string") return;
-      setActiveRoom(joinedRoomId);
-      announcePresence(joinedRoomId);
+
       activeRoomRef.current = joinedRoomId;
+      setActiveRoom(joinedRoomId);
       setRoomId(joinedRoomId);
       setMessage(`Successfully joined room: ${joinedRoomId}`);
+      setParticipants([]);
       clearLocalCanvas();
       setCodeContent(DEFAULT_CODE);
+
+      announcePresence(joinedRoomId);
     };
 
     const onRoomLeft = ({ roomId: leftRoomId } = {}) => {
-      setActiveRoom((current) => {
-        const next = current === leftRoomId ? "" : current;
-        activeRoomRef.current = next;
-        return next;
-      });
+      if (activeRoomRef.current === leftRoomId) {
+        activeRoomRef.current = "";
+        setActiveRoom("");
+        setParticipants([]);
+      }
+
       setMessage(`Left room: ${leftRoomId}`);
       clearLocalCanvas();
     };
@@ -114,18 +139,21 @@ export default function SyncSpacePage({
       socket.off("room-left", onRoomLeft);
       socket.off("room-error", onRoomError);
     };
-  }, [initialRoomId, clearLocalCanvas]);
+  }, [initialRoomId, clearLocalCanvas, announcePresence]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
+
     canvas.width = Math.max(1, Math.floor(rect.width * dpr));
     canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawGrid(ctx, rect.width, rect.height);
   }, [drawGrid]);
@@ -133,6 +161,7 @@ export default function SyncSpacePage({
   useEffect(() => {
     const onRemoteSegment = (data) => {
       if (!data || data.roomId !== activeRoomRef.current) return;
+
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext("2d");
       if (!canvas || !ctx) return;
@@ -145,11 +174,14 @@ export default function SyncSpacePage({
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.stroke();
+
       setHasDrawn(true);
     };
 
     const onRemoteClear = (clearedRoomId) => {
-      if (clearedRoomId === activeRoomRef.current) clearLocalCanvas();
+      if (clearedRoomId === activeRoomRef.current) {
+        clearLocalCanvas();
+      }
     };
 
     const onCodeUpdate = (data) => {
@@ -161,13 +193,14 @@ export default function SyncSpacePage({
         setCodeContent(data.code);
       }
     };
-    const onAwarenessChanged = (data) => {
-  if (!data || data.roomId !== activeRoomRef.current) return;
 
-  setParticipants(
-    Array.isArray(data.participants) ? data.participants : []
-  );
-};
+    const onAwarenessChanged = (data) => {
+      if (!data || data.roomId !== activeRoomRef.current) return;
+
+      setParticipants(
+        Array.isArray(data.participants) ? data.participants : []
+      );
+    };
 
     socket.on("whiteboard:segment", onRemoteSegment);
     socket.on("whiteboard:clear", onRemoteClear);
@@ -187,14 +220,17 @@ export default function SyncSpacePage({
       setMessage("Join a room before drawing collaboratively.");
       return;
     }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const rect = canvas.getBoundingClientRect();
 
     lastPointRef.current = {
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
     };
+
     setIsDrawing(true);
     setHasDrawn(true);
     setMessage("");
@@ -203,15 +239,19 @@ export default function SyncSpacePage({
 
   const draw = (event) => {
     if (!isDrawing || !activeRoom || !socket.connected) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const rect = canvas.getBoundingClientRect();
 
     const currentPoint = {
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
     };
+
     const previousPoint = lastPointRef.current;
+
     if (!previousPoint) {
       lastPointRef.current = currentPoint;
       return;
@@ -228,6 +268,7 @@ export default function SyncSpacePage({
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
     ctx.beginPath();
     ctx.moveTo(segment.x1, segment.y1);
     ctx.lineTo(segment.x2, segment.y2);
@@ -248,6 +289,7 @@ export default function SyncSpacePage({
 
   const clearCanvas = () => {
     clearLocalCanvas();
+
     if (activeRoom && socket.connected) {
       socket.emit("whiteboard:clear", activeRoom);
     }
@@ -255,41 +297,45 @@ export default function SyncSpacePage({
 
   const joinRoom = () => {
     const trimmedRoomId = roomId.trim();
+
     if (!trimmedRoomId) {
       setMessage("Please enter a room ID.");
       return;
     }
+
     if (!socket.connected) {
       setMessage("Connecting to server. Please try again.");
       return;
     }
+
     socket.emit("join-room", trimmedRoomId);
   };
 
   const leaveRoom = () => {
-    if (activeRoom && socket.connected) socket.emit("leave-room", activeRoom);
+    if (activeRoom && socket.connected) {
+      socket.emit("leave-room", activeRoom);
+    }
   };
-  const announcePresence = (joinedRoomId) => {
-  if (!joinedRoomId || !socket.connected) return;
 
-  socket.emit("awareness:update", {
-    roomId: joinedRoomId,
-    name: displayName,
-  });
-};
   const joinQuickRoom = (quickRoomId) => {
     setRoomId(quickRoomId);
+
     if (!socket.connected) {
       setMessage("Connecting to server. Please try again.");
       return;
     }
+
     socket.emit("join-room", quickRoomId);
   };
 
   const updateCode = (updatedCode) => {
     setCodeContent(updatedCode);
+
     if (activeRoom && socket.connected) {
-      socket.emit("code:update", { roomId: activeRoom, code: updatedCode });
+      socket.emit("code:update", {
+        roomId: activeRoom,
+        code: updatedCode,
+      });
     }
   };
 
@@ -327,10 +373,18 @@ export default function SyncSpacePage({
         </div>
 
         <div className="nav-quick-actions">
-          <button className="btn-chip" type="button" onClick={() => joinQuickRoom("team-room")}>
+          <button
+            className="btn-chip"
+            type="button"
+            onClick={() => joinQuickRoom("team-room")}
+          >
             #team-room
           </button>
-          <button className="btn-chip" type="button" onClick={() => joinQuickRoom("design-lab")}>
+          <button
+            className="btn-chip"
+            type="button"
+            onClick={() => joinQuickRoom("design-lab")}
+          >
             #design-lab
           </button>
         </div>
@@ -342,6 +396,7 @@ export default function SyncSpacePage({
             <h1>SyncSpace</h1>
             <p>Real-time collaborative workspace</p>
           </div>
+
           <span className={`status ${status === "Connected" ? "online" : ""}`}>
             ● {status}
           </span>
@@ -356,9 +411,11 @@ export default function SyncSpacePage({
             maxLength={100}
             aria-label="Room ID"
           />
+
           <button id="syncspace-join-btn" type="button" onClick={joinRoom}>
             Join Room
           </button>
+
           <button
             id="syncspace-leave-btn"
             className="secondary"
@@ -368,12 +425,72 @@ export default function SyncSpacePage({
           >
             Leave Room
           </button>
+
           <span className="active-room">
             {activeRoom ? `Room: ${activeRoom}` : "No room joined"}
           </span>
         </section>
 
-        {message && <p className="message" role="status">{message}</p>}
+        {message && (
+          <p className="message" role="status">
+            {message}
+          </p>
+        )}
+
+        {activeRoom && (
+          <section
+            className="panel"
+            aria-label="Room participants"
+            style={{ marginBottom: "16px", padding: "16px" }}
+          >
+            <h2 style={{ marginTop: 0 }}>
+              Participants ({participants.length})
+            </h2>
+
+            {participants.length > 0 ? (
+              <ul
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "12px",
+                  listStyle: "none",
+                  margin: 0,
+                  padding: 0,
+                }}
+              >
+                {participants.map((participant) => (
+                  <li
+                    key={participant.socketId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "8px 12px",
+                      borderRadius: "20px",
+                      background: "rgba(83, 197, 87, 0.12)",
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "50%",
+                        background: "#53C557",
+                      }}
+                    />
+                    {participant.name}
+                    {participant.socketId === socket.id ? " (You)" : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p style={{ marginBottom: 0 }}>
+                Waiting for participants to connect...
+              </p>
+            )}
+          </section>
+        )}
 
         <section className="workspace">
           <div className="panel">
@@ -382,13 +499,16 @@ export default function SyncSpacePage({
                 <span>01</span>
                 <h2>Whiteboard</h2>
               </div>
+
               <div className="panel-tools">
                 <div className="color-picker-mini">
                   {COLORS.map((color) => (
                     <button
                       key={color}
                       type="button"
-                      className={`mini-color ${strokeColor === color ? "active" : ""}`}
+                      className={`mini-color ${
+                        strokeColor === color ? "active" : ""
+                      }`}
                       style={{ backgroundColor: color }}
                       onClick={() => setStrokeColor(color)}
                       aria-label={`Color ${color}`}
@@ -396,8 +516,13 @@ export default function SyncSpacePage({
                     />
                   ))}
                 </div>
+
                 {hasDrawn && (
-                  <button className="btn-mini-clear" type="button" onClick={clearCanvas}>
+                  <button
+                    className="btn-mini-clear"
+                    type="button"
+                    onClick={clearCanvas}
+                  >
                     Clear
                   </button>
                 )}
@@ -416,6 +541,7 @@ export default function SyncSpacePage({
                 style={{ touchAction: "none" }}
                 aria-label="Collaborative whiteboard canvas"
               />
+
               <div className="placeholder">
                 <span className="placeholder-icon">✏️</span>
                 <h3>Collaborative Canvas</h3>
@@ -429,8 +555,13 @@ export default function SyncSpacePage({
               <span>02</span>
               <h2>Code Editor</h2>
             </div>
+
             <div className="code-placeholder">
-              <div className="code-toolbar"><span>JavaScript</span><span className="editor-live-label">Room sync</span></div>
+              <div className="code-toolbar">
+                <span>JavaScript</span>
+                <span className="editor-live-label">Room sync</span>
+              </div>
+
               <textarea
                 aria-label="Collaborative code editor"
                 value={codeContent}
@@ -443,7 +574,9 @@ export default function SyncSpacePage({
           </div>
         </section>
 
-        <footer>SyncSpace <span aria-hidden="true">·</span> Collaborative workspace</footer>
+        <footer>
+          SyncSpace <span aria-hidden="true">·</span> Collaborative workspace
+        </footer>
       </main>
     </div>
   );
