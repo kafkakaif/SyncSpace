@@ -1,7 +1,7 @@
-
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import socket from "../services/socket";
+import WhiteboardCanvas from "./WhiteboardCanvas";
 
 const DEFAULT_CODE = `// Welcome to SyncSpace
 
@@ -9,7 +9,6 @@ function collaborate() {
   console.log("Hello, team!");
 }`;
 
-const COLORS = ["#53C557", "#0E9488", "#23964B", "#111827", "#EF4444"];
 function toYjsUpdate(update) {
   if (update instanceof Uint8Array) {
     return update;
@@ -19,17 +18,16 @@ function toYjsUpdate(update) {
     return new Uint8Array(update);
   }
 
-  if (Array.isArray(update)) {
-    if (
-      update.every(
-        (value) =>
-          Number.isInteger(value) &&
-          value >= 0 &&
-          value <= 255
-      )
-    ) {
-      return Uint8Array.from(update);
-    }
+  if (
+    Array.isArray(update) &&
+    update.every(
+      (value) =>
+        Number.isInteger(value) &&
+        value >= 0 &&
+        value <= 255
+    )
+  ) {
+    return Uint8Array.from(update);
   }
 
   if (
@@ -55,120 +53,97 @@ export default function SyncSpacePage({
   const [message, setMessage] = useState("");
   const [codeContent, setCodeContent] = useState(DEFAULT_CODE);
   const [isCodeSynced, setIsCodeSynced] = useState(false);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [strokeColor, setStrokeColor] = useState("#53C557");
-  const [hasDrawn, setHasDrawn] = useState(false);
-
   const [displayName] = useState(
     () => `User-${Math.random().toString(36).slice(2, 6)}`
   );
   const [participants, setParticipants] = useState([]);
   const [remoteCursors, setRemoteCursors] = useState([]);
-const cursorSendTimeRef = useRef(0);
 
-  const canvasRef = useRef(null);
-  const lastPointRef = useRef(null);
   const activeRoomRef = useRef("");
   const ydocRef = useRef(null);
-const ytextRef = useRef(null);
-const remoteYjsOriginRef = useRef({});
-const initializeYjsDocument = useCallback((joinedRoomId) => {
-  ydocRef.current?.destroy();
+  const ytextRef = useRef(null);
+  const remoteYjsOriginRef = useRef({});
 
-  const doc = new Y.Doc();
-  const sharedText = doc.getText("code");
+  const initializeYjsDocument = useCallback((joinedRoomId) => {
+    ydocRef.current?.destroy();
 
-  ydocRef.current = doc;
-  ytextRef.current = sharedText;
+    const doc = new Y.Doc();
+    const sharedText = doc.getText("code");
 
-  sharedText.observe(() => {
-    setCodeContent(sharedText.toString());
-  });
+    ydocRef.current = doc;
+    ytextRef.current = sharedText;
 
-  doc.on("update", (update, origin) => {
-    if (origin === remoteYjsOriginRef.current) {
-      return;
-    }
-
-    if (!socket.connected) {
-      return;
-    }
-
-    socket.emit("yjs:update", {
-      roomId: joinedRoomId,
-      update,
+    sharedText.observe(() => {
+      setCodeContent(sharedText.toString());
     });
-  });
-}, []);
+
+    doc.on("update", (update, origin) => {
+      if (origin === remoteYjsOriginRef.current || !socket.connected) {
+        return;
+      }
+
+      socket.emit("yjs:update", {
+        roomId: joinedRoomId,
+        update,
+      });
+    });
+  }, []);
+
+  const destroyYjsDocument = useCallback(() => {
+    ydocRef.current?.destroy();
+    ydocRef.current = null;
+    ytextRef.current = null;
+    setIsCodeSynced(false);
+  }, []);
+
+  const announcePresence = useCallback(
+    (joinedRoomId, cursor = null) => {
+      if (!joinedRoomId || !socket.connected) return;
+
+      socket.emit("awareness:update", {
+        roomId: joinedRoomId,
+        name: displayName,
+        cursor,
+      });
+    },
+    [displayName]
+  );
+
   useEffect(() => {
     activeRoomRef.current = activeRoom;
   }, [activeRoom]);
 
-  const drawGrid = useCallback((ctx, width, height) => {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
-
-    for (let x = 15; x < width; x += 25) {
-      for (let y = 15; y < height; y += 25) {
-        ctx.beginPath();
-        ctx.arc(x, y, 1.2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }, []);
-
-  const clearLocalCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    drawGrid(ctx, rect.width, rect.height);
-    setHasDrawn(false);
-  }, [drawGrid]);
-
-
-
-const announcePresence = useCallback((joinedRoomId, cursor = null) => {
-  if (!joinedRoomId || !socket.connected) return;
-
-  const payload = {
-    roomId: joinedRoomId,
-    name: displayName,
-    cursor,
-  };
-
-
-  socket.emit("awareness:update", payload);
-}, [displayName]);
-
-
-
   useEffect(() => {
-    const onConnect = () => {
-      setStatus("Connected");
+    
+const onConnect = () => {
+  setStatus("Connected");
 
-      if (initialRoomId?.trim()) {
-        socket.emit("join-room", initialRoomId.trim());
-      }
-    };
+  const savedRoomId =
+    localStorage.getItem("syncspace:lastRoomId");
 
-    const onDisconnect = () => {
-      setStatus("Disconnected");
-      setActiveRoom("");
-      activeRoomRef.current = "";
-      setParticipants([]);
-      setRemoteCursors([]);
-      ydocRef.current?.destroy();
-ydocRef.current = null;
-ytextRef.current = null;
-setIsCodeSynced(false);
-    };
+  const roomToJoin =
+    initialRoomId?.trim() ||
+    savedRoomId ||
+    activeRoomRef.current;
+
+  if (roomToJoin) {
+    socket.emit("join-room", roomToJoin);
+  }
+};
+
+
+    
+const onDisconnect = () => {
+  setStatus("Disconnected");
+
+  // Keep the active room ID so we can reconnect.
+  // Do not clear the room or destroy the Yjs document here.
+};
+
 
     const onRoomJoined = ({ roomId: joinedRoomId } = {}) => {
       if (typeof joinedRoomId !== "string") return;
+      localStorage.setItem("syncspace:lastRoomId", joinedRoomId);
 
       activeRoomRef.current = joinedRoomId;
       setActiveRoom(joinedRoomId);
@@ -176,12 +151,11 @@ setIsCodeSynced(false);
       setMessage(`Successfully joined room: ${joinedRoomId}`);
       setParticipants([]);
       setRemoteCursors([]);
-      clearLocalCanvas();
       setCodeContent("");
-setIsCodeSynced(false);
+      setIsCodeSynced(false);
 
-initializeYjsDocument(joinedRoomId);
-announcePresence(joinedRoomId);
+      initializeYjsDocument(joinedRoomId);
+      announcePresence(joinedRoomId);
     };
 
     const onRoomLeft = ({ roomId: leftRoomId } = {}) => {
@@ -190,10 +164,11 @@ announcePresence(joinedRoomId);
         setActiveRoom("");
         setParticipants([]);
         setRemoteCursors([]);
+        setCodeContent(DEFAULT_CODE);
+        destroyYjsDocument();
       }
 
       setMessage(`Left room: ${leftRoomId}`);
-      clearLocalCanvas();
     };
 
     const onRoomError = ({ message: errorMessage } = {}) => {
@@ -220,229 +195,72 @@ announcePresence(joinedRoomId);
       socket.off("room-error", onRoomError);
     };
   }, [
-  initialRoomId,
-  clearLocalCanvas,
-  announcePresence,
-  initializeYjsDocument,
-]);
+    initialRoomId,
+    announcePresence,
+    destroyYjsDocument,
+    initializeYjsDocument,
+  ]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-
-    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawGrid(ctx, rect.width, rect.height);
-  }, [drawGrid]);
-
-  useEffect(() => {
-    const onRemoteSegment = (data) => {
+    const applyYjsUpdate = (data, initialSync = false) => {
       if (!data || data.roomId !== activeRoomRef.current) return;
 
-      const canvas = canvasRef.current;
-      const ctx = canvas?.getContext("2d");
-      if (!canvas || !ctx) return;
+      const doc = ydocRef.current;
+      const update = toYjsUpdate(data.update);
 
-      ctx.beginPath();
-      ctx.moveTo(data.x1, data.y1);
-      ctx.lineTo(data.x2, data.y2);
-      ctx.strokeStyle = data.color;
-      ctx.lineWidth = 3;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.stroke();
+      if (!doc || !update) return;
 
-      setHasDrawn(true);
-    };
+      try {
+        Y.applyUpdate(doc, update, remoteYjsOriginRef.current);
 
-    const onRemoteClear = (clearedRoomId) => {
-      if (clearedRoomId === activeRoomRef.current) {
-        clearLocalCanvas();
+        if (initialSync) {
+          setIsCodeSynced(true);
+        }
+      } catch {
+        setMessage("Unable to synchronize the shared code document.");
       }
     };
 
-    const applyYjsUpdate = (data, initialSync = false) => {
-  if (!data || data.roomId !== activeRoomRef.current) {
-    return;
-  }
-
-  const doc = ydocRef.current;
-  const update = toYjsUpdate(data.update);
-
-  if (!doc || !update) {
-    return;
-  }
-
-  try {
-    Y.applyUpdate(doc, update, remoteYjsOriginRef.current);
-
-    if (initialSync) {
-      setIsCodeSynced(true);
-    }
-  } catch {
-    setMessage("Unable to synchronize the shared code document.");
-  }
-};
-
-const onYjsSync = (data) => {
-  applyYjsUpdate(data, true);
-};
-
-const onYjsUpdate = (data) => {
-  applyYjsUpdate(data);
-};
+    const onYjsSync = (data) => applyYjsUpdate(data, true);
+    const onYjsUpdate = (data) => applyYjsUpdate(data);
 
     const onAwarenessChanged = (data) => {
       if (!data || data.roomId !== activeRoomRef.current) return;
 
-  const nextParticipants = Array.isArray(data.participants)
-    ? data.participants
-    : [];
+      const nextParticipants = Array.isArray(data.participants)
+        ? data.participants
+        : [];
 
-  setParticipants(nextParticipants);
+      setParticipants(nextParticipants);
+      setRemoteCursors(
+        nextParticipants.filter(
+          (participant) =>
+            participant.socketId !== socket.id &&
+            participant.cursor &&
+            Number.isFinite(participant.cursor.x) &&
+            Number.isFinite(participant.cursor.y)
+        )
+      );
+    };
 
-  const nextRemoteCursors = nextParticipants.filter(
-  (participant) =>
-    participant.socketId !== socket.id &&
-    participant.cursor &&
-    Number.isFinite(participant.cursor.x) &&
-    Number.isFinite(participant.cursor.y)
-);
-
-
-setRemoteCursors(nextRemoteCursors);
-};
-
-    socket.on("whiteboard:segment", onRemoteSegment);
-    socket.on("whiteboard:clear", onRemoteClear);
     socket.on("yjs:sync", onYjsSync);
-socket.on("yjs:update", onYjsUpdate);
+    socket.on("yjs:update", onYjsUpdate);
     socket.on("awareness:changed", onAwarenessChanged);
 
     return () => {
-      socket.off("whiteboard:segment", onRemoteSegment);
-      socket.off("whiteboard:clear", onRemoteClear);
       socket.off("yjs:sync", onYjsSync);
-socket.off("yjs:update", onYjsUpdate);
+      socket.off("yjs:update", onYjsUpdate);
       socket.off("awareness:changed", onAwarenessChanged);
     };
-  }, [clearLocalCanvas]);
+  }, []);
 
-
-const handleCanvasPointerMove = (event) => {
-  if (!activeRoom || !socket.connected) return;
-
-  const now = Date.now();
-  if (now - cursorSendTimeRef.current < 50) return;
-  cursorSendTimeRef.current = now;
-
-  const canvas = canvasRef.current;
-  if (!canvas) return;
-
-  const rect = canvas.getBoundingClientRect();
-
-  const cursor = {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top,
-  };
-
-
-  announcePresence(activeRoom, cursor);
-};
-
-
-  const startDrawing = (event) => {
-    if (!activeRoom || !socket.connected) {
-      setMessage("Join a room before drawing collaboratively.");
-      return;
-    }
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-
-    lastPointRef.current = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
+  useEffect(() => {
+    return () => {
+      ydocRef.current?.destroy();
+      ydocRef.current = null;
+      ytextRef.current = null;
     };
-
-    setIsDrawing(true);
-    setHasDrawn(true);
-    setMessage("");
-    canvas.setPointerCapture?.(event.pointerId);
-  };
-
-  const draw = (event) => {
-    if (!isDrawing || !activeRoom || !socket.connected) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-
-    const currentPoint = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
-
-    const previousPoint = lastPointRef.current;
-
-    if (!previousPoint) {
-      lastPointRef.current = currentPoint;
-      return;
-    }
-
-    const segment = {
-      roomId: activeRoom,
-      x1: previousPoint.x,
-      y1: previousPoint.y,
-      x2: currentPoint.x,
-      y2: currentPoint.y,
-      color: strokeColor,
-    };
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.beginPath();
-    ctx.moveTo(segment.x1, segment.y1);
-    ctx.lineTo(segment.x2, segment.y2);
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.stroke();
-
-    socket.emit("whiteboard:segment", segment);
-    lastPointRef.current = currentPoint;
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
-    lastPointRef.current = null;
-  };
-
-const handleCanvasPointerLeave = () => {
-  stopDrawing();
-};
-
-
-  const clearCanvas = () => {
-    clearLocalCanvas();
-
-    if (activeRoom && socket.connected) {
-      socket.emit("whiteboard:clear", activeRoom);
-    }
-  };
+  }, []);
 
   const joinRoom = () => {
     const trimmedRoomId = roomId.trim();
@@ -476,66 +294,57 @@ const handleCanvasPointerLeave = () => {
 
     socket.emit("join-room", quickRoomId);
   };
-const updateCode = (updatedCode) => {
-  const doc = ydocRef.current;
-  const sharedText = ytextRef.current;
 
-  if (
-    !activeRoom ||
-    !socket.connected ||
-    !isCodeSynced ||
-    !doc ||
-    !sharedText
-  ) {
-    return;
-  }
+  const updateCode = (updatedCode) => {
+    const doc = ydocRef.current;
+    const sharedText = ytextRef.current;
 
-  const currentCode = sharedText.toString();
-
-  if (currentCode === updatedCode) {
-    return;
-  }
-
-  // Find the unchanged beginning of the text.
-  let prefix = 0;
-
-  while (
-    prefix < currentCode.length &&
-    prefix < updatedCode.length &&
-    currentCode[prefix] === updatedCode[prefix]
-  ) {
-    prefix++;
-  }
-
-  // Find the unchanged ending of the text.
-  let oldEnd = currentCode.length;
-  let newEnd = updatedCode.length;
-
-  while (
-    oldEnd > prefix &&
-    newEnd > prefix &&
-    currentCode[oldEnd - 1] === updatedCode[newEnd - 1]
-  ) {
-    oldEnd--;
-    newEnd--;
-  }
-
-  // Apply only the changed section to the shared Yjs text.
-  doc.transact(() => {
-    const deleteLength = oldEnd - prefix;
-
-    if (deleteLength > 0) {
-      sharedText.delete(prefix, deleteLength);
+    if (
+      !activeRoom ||
+      !socket.connected ||
+      !isCodeSynced ||
+      !doc ||
+      !sharedText
+    ) {
+      return;
     }
 
-    const insertedText = updatedCode.slice(prefix, newEnd);
+    const currentCode = sharedText.toString();
+    if (currentCode === updatedCode) return;
 
-    if (insertedText.length > 0) {
-      sharedText.insert(prefix, insertedText);
+    let prefix = 0;
+    while (
+      prefix < currentCode.length &&
+      prefix < updatedCode.length &&
+      currentCode[prefix] === updatedCode[prefix]
+    ) {
+      prefix++;
     }
-  });
-};
 
+    let oldEnd = currentCode.length;
+    let newEnd = updatedCode.length;
+
+    while (
+      oldEnd > prefix &&
+      newEnd > prefix &&
+      currentCode[oldEnd - 1] === updatedCode[newEnd - 1]
+    ) {
+      oldEnd--;
+      newEnd--;
+    }
+
+    doc.transact(() => {
+      const deleteLength = oldEnd - prefix;
+      if (deleteLength > 0) {
+        sharedText.delete(prefix, deleteLength);
+      }
+
+      const insertedText = updatedCode.slice(prefix, newEnd);
+      if (insertedText.length > 0) {
+        sharedText.insert(prefix, insertedText);
+      }
+    });
+  };
 
   return (
     <div className="syncspace-page-wrapper">
@@ -697,111 +506,14 @@ const updateCode = (updatedCode) => {
                 <span>01</span>
                 <h2>Whiteboard</h2>
               </div>
-
-              <div className="panel-tools">
-                <div className="color-picker-mini">
-                  {COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      className={`mini-color ${
-                        strokeColor === color ? "active" : ""
-                      }`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setStrokeColor(color)}
-                      aria-label={`Color ${color}`}
-                      title={color}
-                    />
-                  ))}
-                </div>
-
-                {hasDrawn && (
-                  <button
-                    className="btn-mini-clear"
-                    type="button"
-                    onClick={clearCanvas}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
             </div>
 
-
-<div className="canvas-container-box" style={{ position: "relative" }}>
-  <canvas
-    ref={canvasRef}
-    className="synced-canvas-element"
-    onPointerDown={startDrawing}
-    onPointerMove={(event) => {
-      handleCanvasPointerMove(event);
-      draw(event);
-    }}
-    onPointerUp={stopDrawing}
-    onPointerCancel={stopDrawing}
-    onPointerLeave={handleCanvasPointerLeave}
-    style={{ touchAction: "none", cursor: "default" }}
-    aria-label="Collaborative whiteboard canvas"
-  />
-
-  {remoteCursors.map((participant, index) => {
-    const cursor = participant.cursor;
-    if (!cursor) return null;
-
-    const color = COLORS[index % COLORS.length];
-
-    return (
-      <div
-        key={participant.socketId}
-        style={{
-          position: "absolute",
-          left: cursor.x,
-          top: cursor.y,
-          zIndex: 9999,
-pointerEvents: "none",
-transform: "translate(-2px, -2px)",
-        }}
-      >
-        <svg
-          width="18"
-          height="22"
-          viewBox="0 0 18 22"
-          aria-hidden="true"
-        >
-          <path
-            d="M1 1 L1 17 L5.5 12.5 L9 20 L12 18.5 L9 11 L16 11 Z"
-            fill={color}
-            stroke="#ffffff"
-            strokeWidth="1.2"
-          />
-        </svg>
-
-        <span
-          style={{
-            display: "inline-block",
-            marginLeft: "4px",
-            padding: "3px 6px",
-            borderRadius: "4px",
-            background: color,
-            color: "#ffffff",
-            fontSize: "11px",
-            fontWeight: 600,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {participant.name}
-        </span>
-      </div>
-    );
-  })}
-
-  <div className="placeholder">
-    <span className="placeholder-icon">✏️</span>
-    <h3>Collaborative Canvas</h3>
-    <p>Join a room, then click and drag to draw with your team.</p>
-  </div>
-</div>
-
+            <WhiteboardCanvas
+              roomId={activeRoom}
+              remoteCursors={remoteCursors}
+              onCursorMove={(cursor) => announcePresence(activeRoom, cursor)}
+              onError={setMessage}
+            />
           </div>
 
           <div className="panel">
@@ -813,7 +525,9 @@ transform: "translate(-2px, -2px)",
             <div className="code-placeholder">
               <div className="code-toolbar">
                 <span>JavaScript</span>
-                <span className="editor-live-label">Room sync</span>
+                <span className="editor-live-label">
+                  {isCodeSynced ? "Yjs synchronized" : "Connecting to room sync..."}
+                </span>
               </div>
 
               <textarea

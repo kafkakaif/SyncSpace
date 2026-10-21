@@ -31,6 +31,7 @@ const io = new Server(server, {
 
 const roomDocuments = new Map();
 const roomAwareness = new Map();
+const roomWhiteboardObjects = new Map();
 
 const MAX_YJS_UPDATE_SIZE = 1024 * 1024;
 const DEFAULT_CODE = `// Welcome to SyncSpace
@@ -39,7 +40,13 @@ function collaborate() {
   console.log("Hello, team!");
 }`;
 
+function getWhiteboardObjects(roomId) {
+  if (!roomWhiteboardObjects.has(roomId)) {
+    roomWhiteboardObjects.set(roomId, []);
+  }
 
+  return roomWhiteboardObjects.get(roomId);
+}
 function getRoomDocument(roomId) {
   if (!roomDocuments.has(roomId)) {
     const doc = new Y.Doc();
@@ -175,7 +182,10 @@ io.on("connection", (socket) => {
 
     socket.join(cleanRoomId);
     getRoomDocument(cleanRoomId);
-
+    socket.emit("whiteboard:state", {
+  roomId: cleanRoomId,
+  items: getWhiteboardObjects(cleanRoomId),
+});
     socket.emit("room-joined", {
       roomId: cleanRoomId,
     });
@@ -357,6 +367,173 @@ io.on("connection", (socket) => {
 
     broadcastAwareness(roomId);
   });
+socket.on("whiteboard:state-request", (roomId) => {
+  if (
+    typeof roomId !== "string" ||
+    !socket.rooms.has(roomId)
+  ) {
+    return;
+  }
+
+  socket.emit("whiteboard:state", {
+    roomId,
+    items: getWhiteboardObjects(roomId),
+  });
+});
+
+  // Add a validated whiteboard object and broadcast it to room members.
+socket.on("whiteboard:object:add", (data) => {
+  if (!data || typeof data !== "object") return;
+
+  const { roomId, item } = data;
+
+  if (
+    typeof roomId !== "string" ||
+    !socket.rooms.has(roomId) ||
+    !item ||
+    typeof item !== "object" ||
+    typeof item.id !== "string" ||
+    item.id.length === 0 ||
+    item.id.length > 100 ||
+    typeof item.color !== "string" ||
+    !/^#[0-9a-fA-F]{6}$/.test(item.color)
+  ) {
+    return;
+  }
+
+  const validCoordinate = (value) =>
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Math.abs(value) <= 10000;
+
+  let cleanItem;
+
+  if (item.type === "line") {
+    if (
+      !Array.isArray(item.points) ||
+      item.points.length < 4 ||
+      item.points.length > 20000 ||
+      item.points.some((value) => !validCoordinate(value)) ||
+      item.points.length % 2 !== 0
+    ) {
+      return;
+    }
+
+    cleanItem = {
+      id: item.id,
+      type: "line",
+      points: [...item.points],
+      color: item.color,
+    };
+  } else if (item.type === "rect") {
+    if (
+      !validCoordinate(item.x) ||
+      !validCoordinate(item.y) ||
+      !validCoordinate(item.width) ||
+      !validCoordinate(item.height) ||
+      item.width < 0 ||
+      item.height < 0
+    ) {
+      return;
+    }
+
+    cleanItem = {
+      id: item.id,
+      type: "rect",
+      x: item.x,
+      y: item.y,
+      width: item.width,
+      height: item.height,
+      color: item.color,
+    };
+  } else if (item.type === "text") {
+    if (
+      !validCoordinate(item.x) ||
+      !validCoordinate(item.y) ||
+      typeof item.text !== "string" ||
+      item.text.trim().length === 0 ||
+      item.text.length > 500
+    ) {
+      return;
+    }
+
+    cleanItem = {
+      id: item.id,
+      type: "text",
+      x: item.x,
+      y: item.y,
+      text: item.text,
+      color: item.color,
+    };
+  } else {
+    return;
+  }
+
+  const objects = getWhiteboardObjects(roomId);
+
+  // Ignore duplicate additions for the same object ID.
+  if (objects.some((existing) => existing.id === cleanItem.id)) {
+    return;
+  }
+
+  objects.push(cleanItem);
+
+  socket.to(roomId).emit("whiteboard:object:add", {
+    roomId,
+    item: cleanItem,
+  });
+});
+
+// Synchronize the position of a movable whiteboard object.
+socket.on("whiteboard:object:update", (data) => {
+  if (!data || typeof data !== "object") return;
+
+  const { roomId, id, position } = data;
+
+  if (
+    typeof roomId !== "string" ||
+    !socket.rooms.has(roomId) ||
+    typeof id !== "string" ||
+    !position ||
+    typeof position !== "object"
+  ) {
+    return;
+  }
+
+  const validCoordinate = (value) =>
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Math.abs(value) <= 10000;
+
+  if (
+    !validCoordinate(position.x) ||
+    !validCoordinate(position.y)
+  ) {
+    return;
+  }
+
+  const objects = getWhiteboardObjects(roomId);
+  const item = objects.find((object) => object.id === id);
+
+  if (
+    !item ||
+    (item.type !== "rect" && item.type !== "text")
+  ) {
+    return;
+  }
+
+  item.x = position.x;
+  item.y = position.y;
+
+  socket.to(roomId).emit("whiteboard:object:update", {
+    roomId,
+    id,
+    position: {
+      x: item.x,
+      y: item.y,
+    },
+  });
+});
 
   // Broadcast whiteboard drawing segments to other room members.
   socket.on("whiteboard:segment", (data) => {
@@ -399,7 +576,7 @@ io.on("connection", (socket) => {
     ) {
       return;
     }
-
+    roomWhiteboardObjects.set(roomId, []);
     socket.to(roomId).emit("whiteboard:clear", roomId);
   });
 
