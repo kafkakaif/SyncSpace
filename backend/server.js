@@ -6,6 +6,7 @@ import cors from "cors";
 import mongoose from "mongoose";
 import * as Y from "yjs";
 import "dotenv/config";
+import authRouter from "./routes/auth.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -13,10 +14,13 @@ const server = http.createServer(app);
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173",
 ];
 
-app.use(cors({ origin: allowedOrigins }));
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
+app.use("/api/auth", authRouter);
 
 const io = new Server(server, {
   cors: {

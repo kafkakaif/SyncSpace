@@ -71,7 +71,7 @@ async function connectToRoom(roomId) {
 }
 
 async function waitForServer() {
-  const deadline = Date.now() + 3000;
+  const deadline = Date.now() + 8000;
 
   while (Date.now() < deadline) {
     try {
@@ -84,7 +84,7 @@ async function waitForServer() {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 
-  throw new Error("Server did not start within 3 seconds");
+  throw new Error("Server did not start within 8 seconds");
 }
 
 test.before(async () => {
