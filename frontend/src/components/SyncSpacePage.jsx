@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
+import { toast } from "react-toastify";
 import socket from "../services/socket";
 import WhiteboardCanvas from "./WhiteboardCanvas";
 
@@ -154,6 +155,8 @@ const onDisconnect = () => {
       setCodeContent("");
       setIsCodeSynced(false);
 
+      toast.success(`Connected to room #${joinedRoomId}`);
+
       initializeYjsDocument(joinedRoomId);
       announcePresence(joinedRoomId);
     };
@@ -167,6 +170,8 @@ const onDisconnect = () => {
         setCodeContent(DEFAULT_CODE);
         destroyYjsDocument();
       }
+
+      toast.info(`Left room #${leftRoomId}`);
 
       setMessage(`Left room: ${leftRoomId}`);
     };

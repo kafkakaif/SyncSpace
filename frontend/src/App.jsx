@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { AuthProvider } from './context/AuthContext';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
@@ -74,75 +76,93 @@ function MainApp() {
     navigateTo('signup', '#register');
   };
 
-  // Render SignIn Page
-  if (currentPage === 'signin') {
-    return (
-      <SignInPage
-        onNavigateToSignUp={handleNavigateToSignUp}
-        onNavigateToHome={handleBackToLanding}
-        onOpenWorkspace={() => handleOpenSyncSpace()}
-      />
-    );
-  }
-
-  // Render SignUp Page
-  if (currentPage === 'signup') {
-    return (
-      <SignUpPage
-        onNavigateToSignIn={handleNavigateToSignIn}
-        onNavigateToHome={handleBackToLanding}
-        onOpenWorkspace={() => handleOpenSyncSpace()}
-      />
-    );
-  }
-
-  // Render SyncSpace Workspace Page
-  if (currentPage === 'syncspace') {
-    return (
-      <SyncSpacePage
-        initialRoomId={selectedRoom}
-        onBackToLanding={handleBackToLanding}
-      />
-    );
-  }
-
-  // Render Landing Page
-  return (
-    <div className="landing-page-root">
-      {/* Navbar with auth status and buttons */}
-      <Navbar
-        onOpenWorkspace={() => handleOpenSyncSpace()}
-        onNavigateToSignIn={handleNavigateToSignIn}
-        onNavigateToSignUp={handleNavigateToSignUp}
-        onNavigateToHome={handleBackToLanding}
-      />
-
-      <main>
-        {/* Hero Section */}
-        <Hero onJoinRoom={(roomId) => handleOpenSyncSpace(roomId)} />
-
-        {/* Live Interactive Playground / Demo */}
-        <InteractivePlayground onLaunchRoom={(roomId) => handleOpenSyncSpace(roomId)} />
-
-        {/* Core Capabilities - Everything your team needs */}
-        <Features />
-
-        {/* Up and running in three steps */}
-        <ThreeSteps
-          onOpenWorkspace={() => handleOpenSyncSpace()}
+  // Render page content
+  const renderPageContent = () => {
+    if (currentPage === 'signin') {
+      return (
+        <SignInPage
           onNavigateToSignUp={handleNavigateToSignUp}
+          onNavigateToHome={handleBackToLanding}
+          onOpenWorkspace={() => handleOpenSyncSpace()}
+        />
+      );
+    }
+
+    if (currentPage === 'signup') {
+      return (
+        <SignUpPage
+          onNavigateToSignIn={handleNavigateToSignIn}
+          onNavigateToHome={handleBackToLanding}
+          onOpenWorkspace={() => handleOpenSyncSpace()}
+        />
+      );
+    }
+
+    if (currentPage === 'syncspace') {
+      return (
+        <SyncSpacePage
+          initialRoomId={selectedRoom}
+          onBackToLanding={handleBackToLanding}
+        />
+      );
+    }
+
+    // Default Landing Page
+    return (
+      <div className="landing-page-root">
+        {/* Navbar with auth status and buttons */}
+        <Navbar
+          onOpenWorkspace={() => handleOpenSyncSpace()}
+          onNavigateToSignIn={handleNavigateToSignIn}
+          onNavigateToSignUp={handleNavigateToSignUp}
+          onNavigateToHome={handleBackToLanding}
         />
 
-        {/* System Architecture */}
-        <ArchitectureSection />
+        <main>
+          {/* Hero Section */}
+          <Hero onJoinRoom={(roomId) => handleOpenSyncSpace(roomId)} />
 
-        {/* FAQ */}
-        <FAQ />
-      </main>
+          {/* Live Interactive Playground / Demo */}
+          <InteractivePlayground onLaunchRoom={(roomId) => handleOpenSyncSpace(roomId)} />
 
-      {/* Footer */}
-      <Footer onOpenWorkspace={() => handleOpenSyncSpace()} />
-    </div>
+          {/* Core Capabilities - Everything your team needs */}
+          <Features />
+
+          {/* Up and running in three steps */}
+          <ThreeSteps
+            onOpenWorkspace={() => handleOpenSyncSpace()}
+            onNavigateToSignUp={handleNavigateToSignUp}
+          />
+
+          {/* System Architecture */}
+          <ArchitectureSection />
+
+          {/* FAQ */}
+          <FAQ />
+        </main>
+
+        {/* Footer */}
+        <Footer onOpenWorkspace={() => handleOpenSyncSpace()} />
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <ToastContainer
+        position="top-right"
+        autoClose={3500}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
+      {renderPageContent()}
+    </>
   );
 }
 

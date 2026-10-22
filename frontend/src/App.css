@@ -1637,7 +1637,8 @@
 
 .nav-quick-actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
 }
 
 .btn-chip {
@@ -2717,4 +2718,106 @@
   width: auto;
   padding: 0 20px;
 }
+
+/* ==========================================================================
+   React-Toastify Top-Right Notification Toast System
+   Customized for SyncSpace & Marinapy High-End Aesthetic
+   ========================================================================== */
+
+.Toastify__toast-container--top-right {
+  top: 20px;
+  right: 24px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  z-index: 99999;
+}
+
+.Toastify__toast {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-heading, #111827);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle, #e8efe9);
+  border-radius: 14px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.02);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.Toastify__toast:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(83, 197, 87, 0.08);
+}
+
+.Toastify__toast-body {
+  font-family: var(--font-sans);
+  color: var(--text-heading, #111827);
+  line-height: 1.45;
+  padding: 0;
+  margin: 0;
+}
+
+.Toastify__toast--success {
+  border-left: 4px solid var(--primary, #53c557);
+}
+
+.Toastify__toast--info {
+  border-left: 4px solid var(--teal, #0e9488);
+}
+
+.Toastify__toast--warning {
+  border-left: 4px solid var(--amber, #f59e0b);
+}
+
+.Toastify__toast--error {
+  border-left: 4px solid var(--rose, #ef4444);
+}
+
+/* Custom Progress Bars */
+.Toastify__progress-bar {
+  height: 3px;
+}
+
+.Toastify__progress-bar--success {
+  background: linear-gradient(90deg, #53c557, #0e9488);
+}
+
+.Toastify__progress-bar--info {
+  background: linear-gradient(90deg, #0e9488, #3b82f6);
+}
+
+.Toastify__progress-bar--warning {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.Toastify__progress-bar--error {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.Toastify__close-button {
+  color: #9ca3af;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  align-self: flex-start;
+}
+
+.Toastify__close-button:hover {
+  color: #111827;
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .Toastify__toast-container--top-right {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+  }
+}
+
 

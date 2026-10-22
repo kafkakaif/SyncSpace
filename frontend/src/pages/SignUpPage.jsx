@@ -1,5 +1,7 @@
+
 import { useState } from 'react';
 import { useAuth } from '../context/useAuth';
+import { toast } from 'react-toastify';
 
 export default function SignUpPage({ onNavigateToSignIn, onNavigateToHome, onOpenWorkspace }) {
   const { signup } = useAuth();
@@ -12,8 +14,6 @@ export default function SignUpPage({ onNavigateToSignIn, onNavigateToHome, onOpe
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
@@ -22,7 +22,6 @@ export default function SignUpPage({ onNavigateToSignIn, onNavigateToHome, onOpe
       ...prev,
       [name]: value,
     }));
-    if (error) setError('');
   };
 
   // Password strength calculation
@@ -42,23 +41,21 @@ export default function SignUpPage({ onNavigateToSignIn, onNavigateToHome, onOpe
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccessMsg('');
 
     if (!formData.name.trim() || formData.name.trim().length < 2) {
-      setError('Please enter your full name (at least 2 characters).');
+      toast.error('Please enter your full name (at least 2 characters).');
       return;
     }
     if (!formData.email.trim() || !formData.email.includes('@')) {
-      setError('Please provide a valid email address.');
+      toast.error('Please provide a valid email address.');
       return;
     }
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long.');
+      toast.error('Password must be at least 6 characters long.');
       return;
     }
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match. Please verify your password.');
+      toast.error('Passwords do not match. Please verify your password.');
       return;
     }
 
@@ -70,18 +67,17 @@ export default function SignUpPage({ onNavigateToSignIn, onNavigateToHome, onOpe
         password: formData.password,
       });
 
-      setSuccessMsg('Account created successfully! Welcome to SyncSpace.');
+      toast.success(`Account created successfully! Welcome to SyncSpace, ${formData.name.trim()}!`);
       setTimeout(() => {
         if (onOpenWorkspace) onOpenWorkspace();
         else if (onNavigateToHome) onNavigateToHome();
       }, 700);
     } catch (err) {
-      setError(err.message || 'Registration failed. Please try again.');
+      toast.error(err.message || 'Registration failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
-
   return (
     <div className="auth-page-root">
       {/* Top Navigation Bar with SyncSpace Branding */}
@@ -137,28 +133,6 @@ export default function SignUpPage({ onNavigateToSignIn, onNavigateToHome, onOpe
         <div className="auth-card" id="signup-card">
           <h1 className="auth-card-title">Create Account</h1>
           <p className="auth-card-subtitle">Create your account to get started</p>
-
-          {/* Feedback Alerts */}
-          {error && (
-            <div className="auth-alert auth-alert-error" role="alert">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <span>{error}</span>
-            </div>
-          )}
-
-          {successMsg && (
-            <div className="auth-alert auth-alert-success" role="status">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-              <span>{successMsg}</span>
-            </div>
-          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} noValidate>
