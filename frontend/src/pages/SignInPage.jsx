@@ -251,15 +251,6 @@ export default function SignInPage({ onNavigateToSignUp, onNavigateToHome, onOpe
             </button>
           </form>
 
-          {/* Quick Demo Access Divider */}
-          <div className="auth-divider">
-            <span className="auth-divider-line"></span>
-            <span className="auth-divider-text">or explore instantly</span>
-            <span className="auth-divider-line"></span>
-          </div>
-
-         
-
           {/* Bottom Switch Link */}
           <p className="auth-switch-text">
             Don't have an account?{' '}

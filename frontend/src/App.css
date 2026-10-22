@@ -987,6 +987,148 @@
   line-height: 1.6;
 }
 
+/* --- Three Steps Section (Up and running in three steps) --- */
+.three-steps-section {
+  padding: 100px 24px;
+  max-width: 1320px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.three-steps-container {
+  position: relative;
+  margin-top: 50px;
+}
+
+.three-steps-track {
+  position: absolute;
+  top: 54px;
+  left: 15%;
+  right: 15%;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(83, 197, 87, 0.25) 0%, rgba(14, 148, 136, 0.5) 50%, rgba(83, 197, 87, 0.25) 100%);
+  z-index: 0;
+}
+
+.three-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  position: relative;
+  z-index: 1;
+}
+
+.step-card {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle, #e8efe9);
+  border-radius: var(--radius-lg, 20px);
+  padding: 36px 28px 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.step-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(83, 197, 87, 0.4);
+  box-shadow: 0 20px 50px rgba(83, 197, 87, 0.12);
+}
+
+.step-badge-wrapper {
+  position: relative;
+  margin-bottom: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-number-badge {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #53c557 0%, #0e9488 100%);
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(83, 197, 87, 0.35);
+  border: 3px solid #ffffff;
+}
+
+.step-icon-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #f0faf1;
+  border: 1.5px solid #53c557;
+  color: #23964b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-icon-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+.step-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-heading, #111827);
+  margin-bottom: 12px;
+}
+
+.step-desc {
+  font-size: 14.5px;
+  color: var(--text-subtle, #5a6b5e);
+  line-height: 1.6;
+  margin-bottom: 24px;
+  flex: 1;
+}
+
+.step-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--primary-deep, #163a24);
+  background: var(--primary-light, #f0faf1);
+  border: 1px solid rgba(83, 197, 87, 0.35);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.step-action-btn:hover {
+  background: var(--primary, #53c557);
+  color: #ffffff;
+  border-color: var(--primary, #53c557);
+  box-shadow: 0 4px 14px rgba(83, 197, 87, 0.3);
+  transform: scale(1.03);
+}
+
+@media (max-width: 960px) {
+  .three-steps-track {
+    display: none;
+  }
+  .three-steps-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
 /* --- Architecture Section (Marinapy bg-[#F6F8FB]) --- */
 .architecture-section {
   padding: 100px 24px;
