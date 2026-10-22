@@ -4,6 +4,7 @@ import http from "node:http";
 import { Server } from "socket.io";
 import cors from "cors";
 import mongoose from "mongoose";
+import WhiteboardState from "./models/WhiteboardState.js";
 import * as Y from "yjs";
 import "dotenv/config";
 import authRouter from "./routes/auth.js";
@@ -47,6 +48,30 @@ function getWhiteboardObjects(roomId) {
 
   return roomWhiteboardObjects.get(roomId);
 }
+async function saveWhiteboardObjects(roomId) {
+  const items = getWhiteboardObjects(roomId);
+
+  await WhiteboardState.findOneAndUpdate(
+    { roomId },
+    { $set: { items } },
+    { upsert: true, new: true, runValidators: true }
+  );
+}
+
+async function loadWhiteboardObjects(roomId) {
+  // Integration tests may run without a MongoDB connection.
+  if (mongoose.connection.readyState !== 1) {
+    return getWhiteboardObjects(roomId);
+  }
+
+  const savedState = await WhiteboardState.findOne({ roomId }).lean();
+  const items = savedState?.items ?? [];
+
+  roomWhiteboardObjects.set(roomId, items);
+
+  return items;
+}
+
 function getRoomDocument(roomId) {
   if (!roomDocuments.has(roomId)) {
     const doc = new Y.Doc();
@@ -140,7 +165,7 @@ io.on("connection", (socket) => {
     }
   };
 
-  const joinRoom = (roomId, acknowledge, created = false) => {
+  const joinRoom = async (roomId, acknowledge, created = false) => {
     if (
       typeof roomId !== "string" ||
       roomId.trim().length === 0 ||
@@ -181,11 +206,25 @@ io.on("connection", (socket) => {
     leaveApplicationRooms();
 
     socket.join(cleanRoomId);
-    getRoomDocument(cleanRoomId);
-    socket.emit("whiteboard:state", {
-  roomId: cleanRoomId,
-  items: getWhiteboardObjects(cleanRoomId),
-});
+getRoomDocument(cleanRoomId);
+
+try {
+  const items = await loadWhiteboardObjects(cleanRoomId);
+
+  socket.emit("whiteboard:state", {
+    roomId: cleanRoomId,
+    items,
+  });
+} catch (error) {
+  console.error("Unable to load whiteboard state:", error.message);
+
+  socket.emit("room-error", {
+    message: "Unable to load the saved whiteboard.",
+  });
+
+  socket.leave(cleanRoomId);
+  return;
+}
     socket.emit("room-joined", {
       roomId: cleanRoomId,
     });
@@ -221,13 +260,13 @@ io.on("connection", (socket) => {
     }
   };
 
-  socket.on("join-room", (roomId, acknowledge) => {
-    joinRoom(roomId, acknowledge);
-  });
+  socket.on("join-room", async (roomId, acknowledge) => {
+  await joinRoom(roomId, acknowledge);
+});
 
-  socket.on("create-room", (roomId, acknowledge) => {
-    joinRoom(roomId, acknowledge, true);
-  });
+socket.on("create-room", async (roomId, acknowledge) => {
+  await joinRoom(roomId, acknowledge, true);
+});
 
   socket.on("leave-room", (roomId, acknowledge) => {
     if (
@@ -382,7 +421,7 @@ socket.on("whiteboard:state-request", (roomId) => {
 });
 
   // Add a validated whiteboard object and broadcast it to room members.
-socket.on("whiteboard:object:add", (data) => {
+socket.on("whiteboard:object:add", async (data) => {
   if (!data || typeof data !== "object") return;
 
   const { roomId, item } = data;
@@ -471,21 +510,35 @@ socket.on("whiteboard:object:add", (data) => {
 
   const objects = getWhiteboardObjects(roomId);
 
-  // Ignore duplicate additions for the same object ID.
-  if (objects.some((existing) => existing.id === cleanItem.id)) {
-    return;
-  }
+// Ignore duplicate additions for the same object ID.
+if (objects.some((existing) => existing.id === cleanItem.id)) {
+  return;
+}
 
-  objects.push(cleanItem);
+objects.push(cleanItem);
 
-  socket.to(roomId).emit("whiteboard:object:add", {
-    roomId,
-    item: cleanItem,
+try {
+  await saveWhiteboardObjects(roomId);
+} catch (error) {
+  objects.pop();
+
+  console.error("Unable to save whiteboard object:", error.message);
+
+  socket.emit("room-error", {
+    message: "Unable to save the whiteboard object.",
   });
+
+  return;
+}
+
+socket.to(roomId).emit("whiteboard:object:add", {
+  roomId,
+  item: cleanItem,
+});
 });
 
 // Synchronize the position of a movable whiteboard object.
-socket.on("whiteboard:object:update", (data) => {
+socket.on("whiteboard:object:update", async (data) => {
   if (!data || typeof data !== "object") return;
 
   const { roomId, id, position } = data;
@@ -521,18 +574,34 @@ socket.on("whiteboard:object:update", (data) => {
   ) {
     return;
   }
+const previousPosition = { x: item.x, y: item.y };
 
-  item.x = position.x;
-  item.y = position.y;
+item.x = position.x;
+item.y = position.y;
 
-  socket.to(roomId).emit("whiteboard:object:update", {
-    roomId,
-    id,
-    position: {
-      x: item.x,
-      y: item.y,
-    },
+try {
+  await saveWhiteboardObjects(roomId);
+} catch (error) {
+  item.x = previousPosition.x;
+  item.y = previousPosition.y;
+
+  console.error("Unable to save whiteboard movement:", error.message);
+
+  socket.emit("room-error", {
+    message: "Unable to save the whiteboard movement.",
   });
+
+  return;
+}
+
+socket.to(roomId).emit("whiteboard:object:update", {
+  roomId,
+  id,
+  position: {
+    x: item.x,
+    y: item.y,
+  },
+});
 });
 
   // Broadcast whiteboard drawing segments to other room members.
@@ -569,16 +638,34 @@ socket.on("whiteboard:object:update", (data) => {
   });
 
   // Clear the whiteboard for other room members.
-  socket.on("whiteboard:clear", (roomId) => {
-    if (
-      typeof roomId !== "string" ||
-      !socket.rooms.has(roomId)
-    ) {
-      return;
-    }
-    roomWhiteboardObjects.set(roomId, []);
-    socket.to(roomId).emit("whiteboard:clear", roomId);
-  });
+  socket.on("whiteboard:clear", async (roomId) => {
+  if (
+    typeof roomId !== "string" ||
+    !socket.rooms.has(roomId)
+  ) {
+    return;
+  }
+
+  const previousObjects = getWhiteboardObjects(roomId);
+
+  roomWhiteboardObjects.set(roomId, []);
+
+  try {
+    await saveWhiteboardObjects(roomId);
+  } catch (error) {
+    roomWhiteboardObjects.set(roomId, previousObjects);
+
+    console.error("Unable to clear saved whiteboard:", error.message);
+
+    socket.emit("room-error", {
+      message: "Unable to clear the saved whiteboard.",
+    });
+
+    return;
+  }
+
+  socket.to(roomId).emit("whiteboard:clear", roomId);
+});
 
   // Keep the current code editor synchronization behavior.
   socket.on("code:update", (data) => {
