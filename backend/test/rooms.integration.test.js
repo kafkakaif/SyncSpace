@@ -199,3 +199,73 @@ test("team-room events never reach a user in private-room", async () => {
 
   await Promise.all([noCodeLeak, noDrawingLeak, noClearLeak, noDocumentLeak]);
 });
+
+test("whiteboard objects synchronize between users in the same room", async () => {
+  const firstUser = await connectToRoom("whiteboard-sync-room");
+  const secondUser = await connectToRoom("whiteboard-sync-room");
+
+  const item = {
+    id: "rect-test-1",
+    type: "rect",
+    x: 10,
+    y: 20,
+    width: 100,
+    height: 60,
+    color: "#2563eb",
+  };
+
+  const receivedAdd = waitFor(secondUser, "whiteboard:object:add");
+
+  firstUser.emit("whiteboard:object:add", {
+    roomId: "whiteboard-sync-room",
+    item,
+  });
+
+  assert.deepEqual(await receivedAdd, {
+    roomId: "whiteboard-sync-room",
+    item,
+  });
+
+  const receivedUpdate = waitFor(secondUser, "whiteboard:object:update");
+
+  firstUser.emit("whiteboard:object:update", {
+    roomId: "whiteboard-sync-room",
+    id: item.id,
+    position: { x: 50, y: 70 },
+  });
+
+  assert.deepEqual(await receivedUpdate, {
+    roomId: "whiteboard-sync-room",
+    id: item.id,
+    position: { x: 50, y: 70 },
+  });
+});
+
+test("whiteboard object events do not leak across rooms", async () => {
+  const teamUser = await connectToRoom("whiteboard-team-room");
+  const privateUser = await connectToRoom("whiteboard-private-room");
+
+  const noAddLeak = expectNoEvent(privateUser, "whiteboard:object:add");
+  const noUpdateLeak = expectNoEvent(privateUser, "whiteboard:object:update");
+
+  teamUser.emit("whiteboard:object:add", {
+    roomId: "whiteboard-team-room",
+    item: {
+      id: "team-rect-1",
+      type: "rect",
+      x: 10,
+      y: 20,
+      width: 50,
+      height: 40,
+      color: "#16a34a",
+    },
+  });
+
+  teamUser.emit("whiteboard:object:update", {
+    roomId: "whiteboard-team-room",
+    id: "team-rect-1",
+    position: { x: 30, y: 40 },
+  });
+
+  await Promise.all([noAddLeak, noUpdateLeak]);
+});

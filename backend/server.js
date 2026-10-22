@@ -33,6 +33,7 @@ const io = new Server(server, {
 const roomDocuments = new Map();
 const roomAwareness = new Map();
 const roomWhiteboardObjects = new Map();
+const roomWhiteboardSaveQueues = new Map();
 
 const MAX_YJS_UPDATE_SIZE = 1024 * 1024;
 const DEFAULT_CODE = `// Welcome to SyncSpace
@@ -48,15 +49,40 @@ function getWhiteboardObjects(roomId) {
 
   return roomWhiteboardObjects.get(roomId);
 }
-async function saveWhiteboardObjects(roomId) {
-  const items = getWhiteboardObjects(roomId);
 
-  await WhiteboardState.findOneAndUpdate(
-    { roomId },
-    { $set: { items } },
-    { upsert: true, new: true, runValidators: true }
-  );
+async function saveWhiteboardObjects(roomId) {
+  const previousSave =
+    roomWhiteboardSaveQueues.get(roomId) ?? Promise.resolve();
+
+  const currentSave = previousSave.catch(() => {}).then(async () => {
+    if (mongoose.connection.readyState !== 1) {
+      return;
+    }
+
+    // Snapshot the latest state when this save reaches the queue.
+    const items = getWhiteboardObjects(roomId).map((item) => ({
+      ...item,
+      ...(Array.isArray(item.points) ? { points: [...item.points] } : {}),
+    }));
+
+    await WhiteboardState.findOneAndUpdate(
+      { roomId },
+      { $set: { items } },
+      { upsert: true, new: true, runValidators: true }
+    );
+  });
+
+  roomWhiteboardSaveQueues.set(roomId, currentSave);
+
+  try {
+    await currentSave;
+  } finally {
+    if (roomWhiteboardSaveQueues.get(roomId) === currentSave) {
+      roomWhiteboardSaveQueues.delete(roomId);
+    }
+  }
 }
+
 
 async function loadWhiteboardObjects(roomId) {
   // Integration tests may run without a MongoDB connection.
