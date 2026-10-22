@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import socket from "../services/socket";
 import WhiteboardCanvas from "./WhiteboardCanvas";

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import socket from '../services/socket';
 
 export default function WorkspaceView({ onBackToHome, initialRoomId = '' }) {
@@ -11,7 +11,7 @@ export default function WorkspaceView({ onBackToHome, initialRoomId = '' }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [penColor, setPenColor] = useState('#53C557');
-  const [penWidth, setPenWidth] = useState(3);
+  const [penWidth] = useState(3);
 
   // Code editor state
   const [code, setCode] = useState(`// Welcome to SyncSpace Collaborative Studio

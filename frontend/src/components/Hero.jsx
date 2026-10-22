@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const RANDOM_ROOMS = [
   'infra-sprint-9',

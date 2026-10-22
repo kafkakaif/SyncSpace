@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const TECH_ITEMS = [
   { name: 'React 19', role: 'Component UI & State', tag: 'Frontend', logo: '⚛️' },
@@ -37,7 +37,7 @@ export default function TechStack() {
           error: `HTTP ${res.status}: Unexpected response`
         });
       }
-    } catch (err) {
+    } catch {
       setPingResult({
         success: false,
         status: 'Offline',

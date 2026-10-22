@@ -36,18 +36,15 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Hash password before saving if modified
-userSchema.pre('save', async function (next) {
+// Async Mongoose middleware resolves when its promise settles. Do not use the
+// legacy `next` callback here: Mongoose 9 does not pass one to async hooks.
+userSchema.pre('save', async function () {
   if (!this.isModified('password')) {
-    return next();
+    return;
   }
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
 // Compare candidate password

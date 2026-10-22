@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Layer, Line, Rect, Stage, Text } from "react-konva";
 import socket from "../services/socket";
 
@@ -43,6 +43,8 @@ export default function WhiteboardCanvas({
   }, []);
 
   useEffect(() => {
+    // The room is server-driven state; clear stale canvas data before subscribing to a new room.
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (!roomId) {
       setItems([]);
       setDraft(null);
@@ -149,6 +151,7 @@ export default function WhiteboardCanvas({
       socket.off("whiteboard:object:update", onObjectUpdated);
       socket.off("whiteboard:clear", onWhiteboardClear);
     };
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [roomId]);
 
   const getPoint = (event) => event.target.getStage()?.getPointerPosition();
@@ -256,8 +259,15 @@ export default function WhiteboardCanvas({
     }
 
     if (draft?.type === "rect" && draft.width >= 3 && draft.height >= 3) {
-      const { startX, startY, ...rectangle } = draft;
-      addItem(rectangle);
+      addItem({
+        id: draft.id,
+        type: draft.type,
+        x: draft.x,
+        y: draft.y,
+        width: draft.width,
+        height: draft.height,
+        color: draft.color,
+      });
     }
 
     setDraft(null);

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 const CODE_SNIPPETS = {
   'server.js': `// SyncSpace Socket.io Gateway
@@ -70,8 +70,8 @@ export default function InteractivePlayground({ onLaunchRoom }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [brushColor, setBrushColor] = useState('#53C557');
-  const [brushWidth, setBrushWidth] = useState(3);
-  const [drawnCount, setDrawnCount] = useState(0);
+  const [brushWidth] = useState(3);
+  const [, setDrawnCount] = useState(0);
 
   // Code Editor State
   const [activeTab, setActiveTab] = useState('server.js');
@@ -96,7 +96,7 @@ export default function InteractivePlayground({ onLaunchRoom }) {
     drawInitialDemo(ctx, rect.width, rect.height);
   }, []);
 
-  const drawInitialDemo = (ctx, w, h) => {
+  function drawInitialDemo(ctx, w, h) {
     ctx.clearRect(0, 0, w, h);
 
     // Grid dots
@@ -176,7 +176,7 @@ export default function InteractivePlayground({ onLaunchRoom }) {
     ctx.fillStyle = '#5A6B5E';
     ctx.font = '10px monospace';
     ctx.fillText('Doc Snapshots', 248, 210);
-  };
+  }
 
   // Canvas drawing handlers
   const startDrawing = (e) => {

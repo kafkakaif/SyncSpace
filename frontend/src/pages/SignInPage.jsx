@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useState } from 'react';
+import { useAuth } from '../context/useAuth';
 
 export default function SignInPage({ onNavigateToSignUp, onNavigateToHome, onOpenWorkspace }) {
-  const { login, loginDemo } = useAuth();
+  const { login } = useAuth();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -49,23 +49,6 @@ export default function SignInPage({ onNavigateToSignUp, onNavigateToHome, onOpe
       }, 700);
     } catch (err) {
       setError(err.message || 'Invalid email or password.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDemoLogin = async () => {
-    setError('');
-    setIsSubmitting(true);
-    try {
-      await loginDemo();
-      setSuccessMsg('Signed in as Demo Engineer!');
-      setTimeout(() => {
-        if (onOpenWorkspace) onOpenWorkspace();
-        else if (onNavigateToHome) onNavigateToHome();
-      }, 700);
-    } catch (err) {
-      setError(err.message || 'Demo login failed.');
     } finally {
       setIsSubmitting(false);
     }
