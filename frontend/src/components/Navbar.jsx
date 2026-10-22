@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navbar({
@@ -12,6 +13,11 @@ export default function Navbar({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
+
+  const handleLogout = () => {
+    logout();
+    toast.info('Signed out successfully.');
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -150,7 +156,7 @@ export default function Navbar({
                     className="user-dropdown-item item-danger"
                     onClick={() => {
                       setUserMenuOpen(false);
-                      logout();
+                      handleLogout();
                     }}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -240,7 +246,7 @@ export default function Navbar({
                   type="button"
                   className="btn-mobile-signout"
                   onClick={() => {
-                    logout();
+                    handleLogout();
                     setMobileMenuOpen(false);
                   }}
                 >
