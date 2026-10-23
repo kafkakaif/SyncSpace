@@ -241,6 +241,21 @@ test("whiteboard objects synchronize between users in the same room", async () =
   });
 });
 
+
+test("clearing a whiteboard notifies everyone in the same room", async () => {
+  const roomId = "clear-test-room";
+
+  const firstUser = await connectToRoom(roomId);
+  const secondUser = await connectToRoom(roomId);
+
+  const cleared = waitFor(secondUser, "whiteboard:clear");
+
+  firstUser.emit("whiteboard:clear", roomId);
+
+  await cleared;
+});
+
+
 test("whiteboard object events do not leak across rooms", async () => {
   const teamUser = await connectToRoom("whiteboard-team-room");
   const privateUser = await connectToRoom("whiteboard-private-room");
@@ -268,4 +283,23 @@ test("whiteboard object events do not leak across rooms", async () => {
   });
 
   await Promise.all([noAddLeak, noUpdateLeak]);
+});
+
+
+
+test("clearing a whiteboard does not affect another room", async () => {
+  const teamRoom = "clear-isolation-team";
+  const privateRoom = "clear-isolation-private";
+
+  const teamUser = await connectToRoom(teamRoom);
+  const privateUser = await connectToRoom(privateRoom);
+
+  const noClearLeak = expectNoEvent(
+    privateUser,
+    "whiteboard:clear"
+  );
+
+  teamUser.emit("whiteboard:clear", teamRoom);
+
+  await noClearLeak;
 });
