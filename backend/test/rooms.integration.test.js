@@ -96,7 +96,7 @@ test.before(async () => {
       MONGO_URI: "",
       MONGODB_URI: "",
     },
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: "inherit",
   });
 
   await waitForServer();

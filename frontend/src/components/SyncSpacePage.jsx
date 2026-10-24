@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
+import Editor from "@monaco-editor/react";
 import { toast } from "react-toastify";
 import socket from "../services/socket";
 import WhiteboardCanvas from "./WhiteboardCanvas";
@@ -535,15 +536,40 @@ const onDisconnect = () => {
                 </span>
               </div>
 
-              <textarea
-                aria-label="Collaborative code editor"
-                value={codeContent}
-                onChange={(event) => updateCode(event.target.value)}
-                spellCheck={false}
-                disabled={!activeRoom || !isCodeSynced}
-                placeholder="Join a room and start writing code..."
-                className="syncspace-code-editor"
-              />
+              
+
+<Editor
+  height="100%"
+  language="javascript"
+  theme="vs-dark"
+  value={codeContent}
+  onMount={(editor, monaco) => {
+    const doc = ydocRef.current;
+    const sharedText = ytextRef.current;
+
+    if (!doc || !sharedText) return;
+
+    const model = editor.getModel();
+    if (!model) return;
+
+    editor.onDidDispose(() => {
+      binding.destroy();
+    });
+  }}
+  onChange={(value) => updateCode(value ?? "")}
+  options={{
+    readOnly: !activeRoom || !isCodeSynced,
+    automaticLayout: true,
+    minimap: { enabled: false },
+    fontSize: 14,
+    wordWrap: "on",
+    scrollBeyondLastLine: false,
+    padding: { top: 16 },
+  }}
+  loading="Loading code editor..."
+/>
+
+
             </div>
           </div>
         </section>

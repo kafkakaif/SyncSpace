@@ -1,4 +1,4 @@
-
+import CodeSession from "./models/CodeSession.js";
 import express from "express";
 import http from "node:http";
 import { Server } from "socket.io";
@@ -98,18 +98,97 @@ async function loadWhiteboardObjects(roomId) {
   return items;
 }
 
-function getRoomDocument(roomId) {
-  if (!roomDocuments.has(roomId)) {
-    const doc = new Y.Doc();
 
-    // Initialize the shared code document once per room.
-    doc.getText("code").insert(0, DEFAULT_CODE);
+const roomCodeSaveQueues = new Map();
+const roomCodeLoadPromises = new Map();
 
-    roomDocuments.set(roomId, doc);
+async function loadRoomDocument(roomId) {
+  if (roomDocuments.has(roomId)) {
+    return roomDocuments.get(roomId);
   }
 
-  return roomDocuments.get(roomId);
+  // Ensure simultaneous joins share the same database load.
+  if (roomCodeLoadPromises.has(roomId)) {
+    return roomCodeLoadPromises.get(roomId);
+  }
+
+  const loading = (async () => {
+    const doc = new Y.Doc();
+
+    try {
+      if (mongoose.connection.readyState === 1) {
+        const saved = await CodeSession.findOne({ roomId })
+          .select("documentState")
+          .lean();
+
+        if (saved?.documentState) {
+          Y.applyUpdate(doc, new Uint8Array(saved.documentState));
+        } else {
+          doc.getText("code").insert(0, DEFAULT_CODE);
+        }
+      } else {
+        // Keep the existing in-memory test mode working.
+        doc.getText("code").insert(0, DEFAULT_CODE);
+      }
+
+      roomDocuments.set(roomId, doc);
+      return doc;
+    } catch (error) {
+      doc.destroy();
+      throw error;
+    }
+  })();
+
+  roomCodeLoadPromises.set(roomId, loading);
+
+  try {
+    return await loading;
+  } finally {
+    if (roomCodeLoadPromises.get(roomId) === loading) {
+      roomCodeLoadPromises.delete(roomId);
+    }
+  }
 }
+
+async function saveRoomDocument(roomId) {
+  const previous = roomCodeSaveQueues.get(roomId) ?? Promise.resolve();
+
+  const current = previous.catch(() => {}).then(async () => {
+    if (mongoose.connection.readyState !== 1) {
+      return;
+    }
+
+    const doc = roomDocuments.get(roomId);
+    if (!doc) return;
+
+    const documentState = Buffer.from(Y.encodeStateAsUpdate(doc));
+
+    await CodeSession.findOneAndUpdate(
+      { roomId },
+      {
+        $set: {
+          documentState,
+          lastSavedAt: new Date(),
+        },
+      },
+      {
+        upsert: true,
+        runValidators: true,
+      }
+    );
+  });
+
+  roomCodeSaveQueues.set(roomId, current);
+
+  try {
+    await current;
+  } finally {
+    if (roomCodeSaveQueues.get(roomId) === current) {
+      roomCodeSaveQueues.delete(roomId);
+    }
+  }
+}
+
 
 
 function toUpdateBuffer(update) {
@@ -173,12 +252,25 @@ io.on("connection", (socket) => {
 
   let displayName = `User-${socket.id.slice(0, 4)}`;
 
-  const sendDocumentState = (roomId) => {
+  const sendDocumentState = async (roomId) => {
+  try {
+    const doc = await loadRoomDocument(roomId);
+
+    // Only send the state if the user is still in this room.
+    if (!socket.rooms.has(roomId)) return;
+
     socket.emit("yjs:sync", {
       roomId,
-      update: Y.encodeStateAsUpdate(getRoomDocument(roomId)),
+      update: Y.encodeStateAsUpdate(doc),
     });
-  };
+  } catch (error) {
+    console.error("Unable to send Yjs document state:", error.message);
+
+    socket.emit("room-error", {
+      message: "Unable to synchronize the shared code document.",
+    });
+  }
+};
 
   const leaveApplicationRooms = () => {
     for (const roomId of [...socket.rooms]) {
@@ -230,10 +322,26 @@ io.on("connection", (socket) => {
     }
 
     leaveApplicationRooms();
+    try {
+  await loadRoomDocument(cleanRoomId);
+} catch (error) {
+  console.error("Unable to load saved code session:", error.message);
 
-    socket.join(cleanRoomId);
-getRoomDocument(cleanRoomId);
+  socket.emit("room-error", {
+    message: "Unable to load the saved code session.",
+  });
 
+  if (typeof acknowledge === "function") {
+    acknowledge({
+      ok: false,
+      message: "Unable to load the saved code session.",
+    });
+  }
+
+  return;
+}
+
+socket.join(cleanRoomId);
 try {
   const items = await loadWhiteboardObjects(cleanRoomId);
 
@@ -332,23 +440,10 @@ socket.on("create-room", async (roomId, acknowledge) => {
     }
   });
 
-  // Send the current shared Yjs document to this client.
-  socket.on("yjs:sync-request", (roomId) => {
-    if (
-      typeof roomId !== "string" ||
-      !socket.rooms.has(roomId)
-    ) {
-      return;
-    }
-
-    sendDocumentState(roomId);
-  });
 
   // Apply and broadcast valid Yjs document updates.
   socket.on("yjs:update", (data) => {
-    if (!data || typeof data !== "object") {
-      return;
-    }
+    if (!data || typeof data !== "object") return;
 
     const { roomId } = data;
     const update = toUpdateBuffer(data.update);
@@ -363,19 +458,38 @@ socket.on("create-room", async (roomId, acknowledge) => {
       return;
     }
 
-    try {
-      Y.applyUpdate(getRoomDocument(roomId), update);
+    const doc = roomDocuments.get(roomId);
 
-      socket.to(roomId).emit("yjs:update", {
-        roomId,
-        update,
+    if (!doc) {
+      socket.emit("room-error", {
+        message: "The shared code document is not ready.",
       });
-    } catch {
+      return;
+    }
+
+    try {
+      Y.applyUpdate(doc, update);
+    } catch (error) {
       socket.emit("room-error", {
         message: "Unable to apply the shared document update.",
       });
+      return;
     }
+
+    socket.to(roomId).emit("yjs:update", {
+      roomId,
+      update,
+    });
+
+    void saveRoomDocument(roomId).catch((error) => {
+      console.error("Unable to save code session:", error.message);
+
+      socket.emit("room-error", {
+        message: "Code was synchronized, but saving the session failed.",
+      });
+    });
   });
+
 
   // Update participant names and remote cursor coordinates.
   socket.on("awareness:update", (data) => {
