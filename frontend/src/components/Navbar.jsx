@@ -85,10 +85,9 @@ export default function Navbar({
 
         {/* Desktop Nav Links */}
         <nav className="nav-links" aria-label="Main Navigation">
-          <a href="#features" className="nav-link">Features</a>
-          <a href="#how-it-works" className="nav-link">How It Works</a>
           <a href="#playground" className="nav-link">Live Demo</a>
-          <a href="#architecture" className="nav-link">Architecture</a>
+          <a href="#features" className="nav-link">Core Features</a>
+          <a href="#architecture" className="nav-link">System Architecture</a>
           <a href="#faq" className="nav-link">FAQ</a>
         </nav>
 
@@ -224,10 +223,9 @@ export default function Navbar({
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="mobile-menu">
-          <a href="#features" onClick={() => setMobileMenuOpen(false)}>Features</a>
-          <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)}>How It Works</a>
           <a href="#playground" onClick={() => setMobileMenuOpen(false)}>Live Demo</a>
-          <a href="#architecture" onClick={() => setMobileMenuOpen(false)}>Architecture</a>
+          <a href="#features" onClick={() => setMobileMenuOpen(false)}>Core Features</a>
+          <a href="#architecture" onClick={() => setMobileMenuOpen(false)}>System Architecture</a>
           <a href="#faq" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
 
           <div className="mobile-menu-footer">

@@ -43,10 +43,10 @@ export default function Footer({ onOpenWorkspace }) {
           <nav className="footer-col" aria-label="Footer Quick Links">
             <h4 className="footer-col-title">Navigation</h4>
             <ul className="footer-link-list">
+              <li><a href="#playground">Live Demo</a></li>
               <li><a href="#features">Core Features</a></li>
-              <li><a href="#playground">Interactive Demo</a></li>
               <li><a href="#architecture">System Architecture</a></li>
-              <li><a href="#faq">Frequently Asked Questions</a></li>
+              <li><a href="#faq">FAQ</a></li>
             </ul>
           </nav>
 

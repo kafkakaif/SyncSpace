@@ -8,7 +8,6 @@ import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import InteractivePlayground from './components/InteractivePlayground';
 import Features from './components/Features';
-import ThreeSteps from './components/ThreeSteps';
 import ArchitectureSection from './components/ArchitectureSection';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
@@ -126,13 +125,7 @@ function MainApp() {
           <InteractivePlayground onLaunchRoom={(roomId) => handleOpenSyncSpace(roomId)} />
 
           {/* Core Capabilities - Everything your team needs */}
-          <Features />
-
-          {/* Up and running in three steps */}
-          <ThreeSteps
-            onOpenWorkspace={() => handleOpenSyncSpace()}
-            onNavigateToSignUp={handleNavigateToSignUp}
-          />
+          <Features onOpenWorkspace={() => handleOpenSyncSpace()} />
 
           {/* System Architecture */}
           <ArchitectureSection />
