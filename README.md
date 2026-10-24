@@ -253,9 +253,23 @@ Only configure variables when the corresponding feature is implemented. Never co
 
 ## 📈 Project Status
 
-**Current milestone:** Week 1 — foundation and room infrastructure.
+**Current milestone:** Week 2 — Yjs awareness and collaborative whiteboard implementation.
 
-Update this section as the team completes and tests each milestone. Mark a feature complete only after it works in the integrated application.
+**Completed in Week 2**
+
+- Added per-room Yjs documents and Socket.IO synchronization for shared code state.
+- Added participant presence, display names, and remote cursor coordinates.
+- Built the React-Konva whiteboard with freehand lines, rectangles, text, colours, clearing, and movable objects.
+- Added room-scoped whiteboard state synchronization, including the initial state for users who join later.
+- Added integration tests for Yjs updates, awareness, whiteboard synchronization, and room isolation.
+
+**Remaining before Week 2 is signed off**
+
+- Run and record a two-browser synchronization audit for code, whiteboard updates, presence/cursors, reconnection, and room isolation.
+- Frontend build and lint completed successfully; backend integration suite passed all 12 tests.
+- Update the architecture documentation to describe the implemented Socket.IO-based awareness approach.
+
+Week 3 work is next: persist and restore Yjs document state, integrate Monaco Editor with the shared text type, and test concurrent editing and recovery.
 
 ## 🤝 Contributing
 
