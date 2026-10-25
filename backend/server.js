@@ -9,6 +9,8 @@ import * as Y from "yjs";
 import "dotenv/config";
 import authRouter from "./routes/auth.js";
 
+const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+
 const app = express();
 const server = http.createServer(app);
 
@@ -48,6 +50,18 @@ function getWhiteboardObjects(roomId) {
   }
 
   return roomWhiteboardObjects.get(roomId);
+}
+
+function toPersistedYjsUpdate(documentState) {
+  if (Buffer.isBuffer(documentState)) {
+    return Uint8Array.from(documentState);
+  }
+
+  if (documentState?.buffer) {
+    return Uint8Array.from(Buffer.from(documentState.buffer));
+  }
+
+  return Uint8Array.from(documentState);
 }
 
 async function saveWhiteboardObjects(roomId) {
@@ -116,13 +130,17 @@ async function loadRoomDocument(roomId) {
     const doc = new Y.Doc();
 
     try {
+      if (mongoUri && mongoose.connection.readyState !== 1) {
+        throw new Error("MongoDB is unavailable; the code session cannot be recovered.");
+      }
+
       if (mongoose.connection.readyState === 1) {
         const saved = await CodeSession.findOne({ roomId })
           .select("documentState")
           .lean();
 
         if (saved?.documentState) {
-          Y.applyUpdate(doc, new Uint8Array(saved.documentState));
+          Y.applyUpdate(doc, toPersistedYjsUpdate(saved.documentState));
         } else {
           doc.getText("code").insert(0, DEFAULT_CODE);
         }
@@ -865,7 +883,6 @@ socket.to(roomId).emit("whiteboard:object:update", {
 });
 
 const PORT = process.env.PORT || 5000;
-const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
 
 async function startServer() {
   try {
@@ -893,7 +910,15 @@ async function startServer() {
       "Unable to connect to MongoDB:",
       error.message
     );
-    process.exit(1);
+
+    // Keep the collaboration server reachable so clients receive a clear
+    // room error instead of an unexplained connection failure. A configured
+    // database is still required before a persisted room can be joined.
+    server.listen(PORT, () => {
+      console.warn(
+        `SyncSpace backend running without MongoDB at http://localhost:${PORT}`
+      );
+    });
   }
 }
 
