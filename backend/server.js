@@ -663,6 +663,18 @@ socket.on("whiteboard:object:add", async (data) => {
       height: item.height,
       color: item.color,
     };
+  } else if (item.type === "circle") {
+    if (!validCoordinate(item.x) || !validCoordinate(item.y) || !validCoordinate(item.radius) || item.radius < 0) return;
+    cleanItem = { id: item.id, type: "circle", x: item.x, y: item.y, radius: item.radius, color: item.color };
+  } else if (item.type === "arrow") {
+    if (!Array.isArray(item.points) || item.points.length !== 4 || item.points.some((value) => !validCoordinate(value))) return;
+    cleanItem = { id: item.id, type: "arrow", points: [...item.points], color: item.color };
+  } else if (item.type === "diamond") {
+    if (!validCoordinate(item.x) || !validCoordinate(item.y) || !validCoordinate(item.width) || !validCoordinate(item.height) || item.width < 0 || item.height < 0) return;
+    cleanItem = { id: item.id, type: "diamond", x: item.x, y: item.y, width: item.width, height: item.height, color: item.color };
+  } else if (item.type === "sticky") {
+    if (!validCoordinate(item.x) || !validCoordinate(item.y) || typeof item.text !== "string" || item.text.trim().length === 0 || item.text.length > 500) return;
+    cleanItem = { id: item.id, type: "sticky", x: item.x, y: item.y, text: item.text.trim(), color: item.color };
   } else if (item.type === "text") {
     if (
       !validCoordinate(item.x) ||
@@ -748,7 +760,7 @@ socket.on("whiteboard:object:update", async (data) => {
 
   if (
     !item ||
-    (item.type !== "rect" && item.type !== "text")
+    (!["rect", "text", "circle", "diamond", "sticky"].includes(item.type))
   ) {
     return;
   }

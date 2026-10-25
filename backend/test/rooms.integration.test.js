@@ -241,6 +241,23 @@ test("whiteboard objects synchronize between users in the same room", async () =
   });
 });
 
+test("additional whiteboard shapes synchronize between room members", async () => {
+  const firstUser = await connectToRoom("additional-shapes-room");
+  const secondUser = await connectToRoom("additional-shapes-room");
+  const shapes = [
+    { id: "circle-1", type: "circle", x: 50, y: 50, radius: 20, color: "#2563eb" },
+    { id: "arrow-1", type: "arrow", points: [10, 10, 80, 80], color: "#16a34a" },
+    { id: "diamond-1", type: "diamond", x: 20, y: 20, width: 60, height: 60, color: "#ef4444" },
+    { id: "sticky-1", type: "sticky", x: 30, y: 30, text: "Architecture idea", color: "#0e9488" },
+  ];
+
+  for (const item of shapes) {
+    const received = waitFor(secondUser, "whiteboard:object:add");
+    firstUser.emit("whiteboard:object:add", { roomId: "additional-shapes-room", item });
+    assert.deepEqual(await received, { roomId: "additional-shapes-room", item });
+  }
+});
+
 
 test("clearing a whiteboard notifies everyone in the same room", async () => {
   const roomId = "clear-test-room";

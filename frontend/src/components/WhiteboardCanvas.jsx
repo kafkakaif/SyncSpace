@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Layer, Line, Rect, Stage, Text } from "react-konva";
+import { Arrow, Circle, Group, Layer, Line, Rect, Stage, Text } from "react-konva";
 import socket from "../services/socket";
 
 const COLORS = ["#53C557", "#0E9488", "#23964B", "#111827", "#EF4444"];
@@ -79,6 +79,22 @@ export default function WhiteboardCanvas({
 
         if (item.type === "rect") {
           return [item.x, item.y, item.width, item.height].every(isValidPoint);
+        }
+
+        if (item.type === "circle") {
+          return [item.x, item.y, item.radius].every(isValidPoint) && item.radius >= 0;
+        }
+
+        if (item.type === "arrow") {
+          return Array.isArray(item.points) && item.points.length === 4 && item.points.every(isValidPoint);
+        }
+
+        if (item.type === "diamond") {
+          return [item.x, item.y, item.width, item.height].every(isValidPoint);
+        }
+
+        if (item.type === "sticky") {
+          return isValidPoint(item.x) && isValidPoint(item.y) && typeof item.text === "string";
         }
 
         if (item.type === "text") {
@@ -198,17 +214,20 @@ export default function WhiteboardCanvas({
         points: [point.x, point.y],
         color,
       });
-    } else if (tool === "rectangle") {
+    } else if (["rectangle", "diamond", "circle", "arrow"].includes(tool)) {
       drawingRef.current = true;
+      const type = tool === "rectangle" ? "rect" : tool;
       setDraft({
         id: crypto.randomUUID(),
-        type: "rect",
+        type,
         startX: point.x,
         startY: point.y,
         x: point.x,
         y: point.y,
         width: 0,
         height: 0,
+        radius: 0,
+        points: [point.x, point.y, point.x, point.y],
         color,
       });
     } else if (tool === "text") {
@@ -218,6 +237,19 @@ export default function WhiteboardCanvas({
       addItem({
         id: crypto.randomUUID(),
         type: "text",
+        x: point.x,
+        y: point.y,
+        text: value.trim(),
+        color,
+      });
+      setTool("select");
+    } else if (tool === "sticky") {
+      const value = window.prompt("Enter sticky note text:", "Idea");
+      if (!value?.trim()) return;
+
+      addItem({
+        id: crypto.randomUUID(),
+        type: "sticky",
         x: point.x,
         y: point.y,
         text: value.trim(),
@@ -239,7 +271,7 @@ export default function WhiteboardCanvas({
         ...previous,
         points: [...previous.points, point.x, point.y],
       }));
-    } else if (draft.type === "rect") {
+    } else if (draft.type === "rect" || draft.type === "diamond") {
       setDraft((previous) => ({
         ...previous,
         x: Math.min(previous.startX, point.x),
@@ -247,6 +279,13 @@ export default function WhiteboardCanvas({
         width: Math.abs(point.x - previous.startX),
         height: Math.abs(point.y - previous.startY),
       }));
+    } else if (draft.type === "circle") {
+      setDraft((previous) => ({
+        ...previous,
+        radius: Math.hypot(point.x - previous.startX, point.y - previous.startY),
+      }));
+    } else if (draft.type === "arrow") {
+      setDraft((previous) => ({ ...previous, points: [previous.startX, previous.startY, point.x, point.y] }));
     }
   };
 
@@ -258,7 +297,7 @@ export default function WhiteboardCanvas({
       addItem(draft);
     }
 
-    if (draft?.type === "rect" && draft.width >= 3 && draft.height >= 3) {
+    if (["rect", "diamond"].includes(draft?.type) && draft.width >= 3 && draft.height >= 3) {
       addItem({
         id: draft.id,
         type: draft.type,
@@ -268,6 +307,15 @@ export default function WhiteboardCanvas({
         height: draft.height,
         color: draft.color,
       });
+    }
+
+    if (draft?.type === "circle" && draft.radius >= 3) {
+      addItem({ id: draft.id, type: "circle", x: draft.x, y: draft.y, radius: draft.radius, color: draft.color });
+    }
+
+    if (draft?.type === "arrow") {
+      const [x1, y1, x2, y2] = draft.points;
+      if (Math.hypot(x2 - x1, y2 - y1) >= 3) addItem({ id: draft.id, type: "arrow", points: draft.points, color: draft.color });
     }
 
     setDraft(null);
@@ -355,6 +403,22 @@ const broadcastDragPosition = (id, event) => {
       );
     }
 
+    if (item.type === "circle") {
+      return <Circle key={item.id} x={item.x} y={item.y} radius={item.radius} stroke={item.color} strokeWidth={2} fill="rgba(83, 197, 87, 0.08)" draggable={tool === "select"} onDragMove={(event) => broadcastDragPosition(item.id, event)} onDragEnd={(event) => updatePosition(item.id, { x: event.target.x(), y: event.target.y() })} />;
+    }
+
+    if (item.type === "arrow") {
+      return <Arrow key={item.id} points={item.points} stroke={item.color} fill={item.color} strokeWidth={3} pointerLength={10} pointerWidth={10} />;
+    }
+
+    if (item.type === "diamond") {
+      return <Line key={item.id} x={item.x} y={item.y} points={[item.width / 2, 0, item.width, item.height / 2, item.width / 2, item.height, 0, item.height / 2]} closed stroke={item.color} strokeWidth={2} fill="rgba(83, 197, 87, 0.08)" draggable={tool === "select"} onDragMove={(event) => broadcastDragPosition(item.id, event)} onDragEnd={(event) => updatePosition(item.id, { x: event.target.x(), y: event.target.y() })} />;
+    }
+
+    if (item.type === "sticky") {
+      return <Group key={item.id} x={item.x} y={item.y} draggable={tool === "select"} onDragMove={(event) => broadcastDragPosition(item.id, event)} onDragEnd={(event) => updatePosition(item.id, { x: event.target.x(), y: event.target.y() })}><Rect width={160} height={100} fill="#fef08a" stroke={item.color} strokeWidth={2} cornerRadius={6} /><Text text={item.text} width={140} padding={10} fontSize={16} fill="#1f2937" /></Group>;
+    }
+
     if (item.type === "text") {
       return (
         <Text
@@ -396,7 +460,11 @@ const broadcastDragPosition = (id, event) => {
           ["select", "Select / Move"],
           ["draw", "Freehand"],
           ["rectangle", "Rectangle"],
+          ["circle", "Circle"],
+          ["arrow", "Arrow"],
+          ["diamond", "Diamond"],
           ["text", "Text"],
+          ["sticky", "Sticky Note"],
         ].map(([value, label]) => (
           <button
             key={value}

@@ -6,11 +6,81 @@ import { toast } from "react-toastify";
 import socket from "../services/socket";
 import WhiteboardCanvas from "./WhiteboardCanvas";
 
-const DEFAULT_CODE = `// Welcome to SyncSpace
+const STARTER_CODE = {
+  javascript: `function collaborate() {
+  console.log("Hello from SyncSpace");
+}
 
-function collaborate() {
-  console.log("Hello, team!");
-}`;
+collaborate();`,
+  typescript: `function collaborate(): void {
+  console.log("Hello from SyncSpace");
+}
+
+collaborate();`,
+  python: `def collaborate():
+    print("Hello from SyncSpace")
+
+
+if __name__ == "__main__":
+    collaborate()`,
+  html: `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SyncSpace</title>
+  </head>
+  <body>
+    <h1 id="message"></h1>
+    <script>
+      function collaborate() {
+        document.querySelector("#message").textContent = "Hello from SyncSpace";
+      }
+
+      collaborate();
+    </script>
+  </body>
+</html>`,
+  css: `:root {
+  font-family: system-ui, sans-serif;
+  color: #111827;
+}
+
+.collaborate-message::after {
+  content: "Hello from SyncSpace";
+  display: block;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: #dcfce7;
+}`,
+  json: `{
+  "function": {
+    "name": "collaborate",
+    "action": "log",
+    "message": "Hello from SyncSpace"
+  }
+}`,
+  cpp: `#include <iostream>
+
+int main() {
+    std::cout << "Hello from SyncSpace" << std::endl;
+    return 0;
+}`,
+  java: `public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello from SyncSpace");
+    }
+}`,
+  sql: `SELECT 'Hello from SyncSpace' AS message;`,
+  markdown: `# SyncSpace
+
+## Collaboration note
+
+Use this shared document to capture ideas and decisions.`
+};
+
+function getStarterCode(language) {
+  return STARTER_CODE[language] ?? STARTER_CODE.javascript;
+}
 
 const SUPPORTED_LANGUAGES = [
   { id: "javascript", label: "JavaScript" },
@@ -185,7 +255,7 @@ export default function SyncSpacePage({
     if (editorRef.current) {
       const model = editorRef.current.getModel();
       if (model && !model.isDisposed()) {
-        model.setValue(DEFAULT_CODE);
+        model.setValue(getStarterCode("javascript"));
         if (monacoRef.current) {
           monacoRef.current.editor.setModelLanguage(model, "javascript");
         }
@@ -437,6 +507,8 @@ const onDisconnect = () => {
   const handleLanguageChange = (newLanguage) => {
     setLanguage(newLanguage);
 
+    const starterCode = getStarterCode(newLanguage);
+
     if (editorRef.current && monacoRef.current) {
       const model = editorRef.current.getModel();
       if (model && !model.isDisposed()) {
@@ -444,9 +516,20 @@ const onDisconnect = () => {
       }
     }
 
-    // Propagate language change across the shared room through Yjs
-    if (activeRoom && yconfigRef.current && socket.connected) {
-      yconfigRef.current.set("language", newLanguage);
+    // Language and starter code are one shared Yjs update, so every room
+    // participant sees the matching program when the language changes.
+    if (activeRoom && yconfigRef.current && ytextRef.current && socket.connected) {
+      ydocRef.current?.transact(() => {
+        yconfigRef.current.set("language", newLanguage);
+        ytextRef.current.delete(0, ytextRef.current.length);
+        ytextRef.current.insert(0, starterCode);
+      });
+      toast.info(`Switched shared code to ${newLanguage}.`);
+    } else if (editorRef.current) {
+      const model = editorRef.current.getModel();
+      if (model && !model.isDisposed()) {
+        model.setValue(starterCode);
+      }
     }
   };
 
@@ -656,7 +739,7 @@ const onDisconnect = () => {
                   height="100%"
                   language={language}
                   theme="vs-dark"
-                  defaultValue={DEFAULT_CODE}
+                  defaultValue={getStarterCode("javascript")}
                   onMount={handleEditorDidMount}
                   options={{
                     readOnly: !activeRoom || !isCodeSynced,
