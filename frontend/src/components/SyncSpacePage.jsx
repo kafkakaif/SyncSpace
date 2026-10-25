@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import Editor from "@monaco-editor/react";
+import { MonacoBinding } from "y-monaco";
 import { toast } from "react-toastify";
 import socket from "../services/socket";
 import WhiteboardCanvas from "./WhiteboardCanvas";
@@ -10,6 +11,19 @@ const DEFAULT_CODE = `// Welcome to SyncSpace
 function collaborate() {
   console.log("Hello, team!");
 }`;
+
+const SUPPORTED_LANGUAGES = [
+  { id: "javascript", label: "JavaScript" },
+  { id: "typescript", label: "TypeScript" },
+  { id: "python", label: "Python" },
+  { id: "html", label: "HTML" },
+  { id: "css", label: "CSS" },
+  { id: "json", label: "JSON" },
+  { id: "cpp", label: "C++" },
+  { id: "java", label: "Java" },
+  { id: "sql", label: "SQL" },
+  { id: "markdown", label: "Markdown" },
+];
 
 function toYjsUpdate(update) {
   if (update instanceof Uint8Array) {
@@ -53,8 +67,8 @@ export default function SyncSpacePage({
     socket.connected ? "Connected" : "Disconnected"
   );
   const [message, setMessage] = useState("");
-  const [codeContent, setCodeContent] = useState(DEFAULT_CODE);
   const [isCodeSynced, setIsCodeSynced] = useState(false);
+  const [language, setLanguage] = useState("javascript");
   const [displayName] = useState(
     () => `User-${Math.random().toString(36).slice(2, 6)}`
   );
@@ -64,20 +78,84 @@ export default function SyncSpacePage({
   const activeRoomRef = useRef("");
   const ydocRef = useRef(null);
   const ytextRef = useRef(null);
+  const yconfigRef = useRef(null);
+  const editorRef = useRef(null);
+  const monacoRef = useRef(null);
+  const bindingRef = useRef(null);
   const remoteYjsOriginRef = useRef({});
 
+  const bindEditorToYjs = useCallback((editorInstance, sharedYText) => {
+    const editor = editorInstance || editorRef.current;
+    const text = sharedYText || ytextRef.current;
+
+    if (!editor || !text) {
+      return;
+    }
+
+    const model = editor.getModel();
+    if (!model || model.isDisposed()) return;
+
+    if (bindingRef.current) {
+      bindingRef.current.destroy();
+      bindingRef.current = null;
+    }
+
+    try {
+      bindingRef.current = new MonacoBinding(
+        text,
+        model,
+        new Set([editor])
+      );
+    } catch (error) {
+      console.error("Unable to bind Monaco Editor to Yjs text type:", error);
+    }
+  }, []);
+
   const initializeYjsDocument = useCallback((joinedRoomId) => {
+    if (bindingRef.current) {
+      bindingRef.current.destroy();
+      bindingRef.current = null;
+    }
+
     ydocRef.current?.destroy();
 
     const doc = new Y.Doc();
     const sharedText = doc.getText("code");
+    const sharedConfig = doc.getMap("config");
 
     ydocRef.current = doc;
     ytextRef.current = sharedText;
+    yconfigRef.current = sharedConfig;
 
-    sharedText.observe(() => {
-      setCodeContent(sharedText.toString());
+    // Synchronize language if room already has a configured language
+    const roomLanguage = sharedConfig.get("language");
+    if (roomLanguage && typeof roomLanguage === "string") {
+      setLanguage(roomLanguage);
+      if (editorRef.current && monacoRef.current) {
+        const model = editorRef.current.getModel();
+        if (model && !model.isDisposed()) {
+          monacoRef.current.editor.setModelLanguage(model, roomLanguage);
+        }
+      }
+    }
+
+    // Observe remote language changes from collaborators
+    sharedConfig.observe(() => {
+      const updatedLang = sharedConfig.get("language");
+      if (updatedLang && typeof updatedLang === "string") {
+        setLanguage(updatedLang);
+        if (editorRef.current && monacoRef.current) {
+          const model = editorRef.current.getModel();
+          if (model && !model.isDisposed()) {
+            monacoRef.current.editor.setModelLanguage(model, updatedLang);
+          }
+        }
+      }
     });
+
+    if (editorRef.current) {
+      bindEditorToYjs(editorRef.current, sharedText);
+    }
 
     doc.on("update", (update, origin) => {
       if (origin === remoteYjsOriginRef.current || !socket.connected) {
@@ -89,13 +167,30 @@ export default function SyncSpacePage({
         update,
       });
     });
-  }, []);
+  }, [bindEditorToYjs]);
 
   const destroyYjsDocument = useCallback(() => {
+    if (bindingRef.current) {
+      bindingRef.current.destroy();
+      bindingRef.current = null;
+    }
+
     ydocRef.current?.destroy();
     ydocRef.current = null;
     ytextRef.current = null;
+    yconfigRef.current = null;
     setIsCodeSynced(false);
+    setLanguage("javascript");
+
+    if (editorRef.current) {
+      const model = editorRef.current.getModel();
+      if (model && !model.isDisposed()) {
+        model.setValue(DEFAULT_CODE);
+        if (monacoRef.current) {
+          monacoRef.current.editor.setModelLanguage(model, "javascript");
+        }
+      }
+    }
   }, []);
 
   const announcePresence = useCallback(
@@ -153,7 +248,6 @@ const onDisconnect = () => {
       setMessage(`Successfully joined room: ${joinedRoomId}`);
       setParticipants([]);
       setRemoteCursors([]);
-      setCodeContent("");
       setIsCodeSynced(false);
 
       toast.success(`Connected to room #${joinedRoomId}`);
@@ -168,7 +262,6 @@ const onDisconnect = () => {
         setActiveRoom("");
         setParticipants([]);
         setRemoteCursors([]);
-        setCodeContent(DEFAULT_CODE);
         destroyYjsDocument();
       }
 
@@ -221,6 +314,19 @@ const onDisconnect = () => {
 
         if (initialSync) {
           setIsCodeSynced(true);
+          const savedLang = doc.getMap("config")?.get("language");
+          if (savedLang && typeof savedLang === "string") {
+            setLanguage(savedLang);
+            if (editorRef.current && monacoRef.current) {
+              const model = editorRef.current.getModel();
+              if (model && !model.isDisposed()) {
+                monacoRef.current.editor.setModelLanguage(model, savedLang);
+              }
+            }
+          }
+          if (editorRef.current && ytextRef.current && !bindingRef.current) {
+            bindEditorToYjs(editorRef.current, ytextRef.current);
+          }
         }
       } catch {
         setMessage("Unable to synchronize the shared code document.");
@@ -258,10 +364,14 @@ const onDisconnect = () => {
       socket.off("yjs:update", onYjsUpdate);
       socket.off("awareness:changed", onAwarenessChanged);
     };
-  }, []);
+  }, [bindEditorToYjs]);
 
   useEffect(() => {
     return () => {
+      if (bindingRef.current) {
+        bindingRef.current.destroy();
+        bindingRef.current = null;
+      }
       ydocRef.current?.destroy();
       ydocRef.current = null;
       ytextRef.current = null;
@@ -301,55 +411,43 @@ const onDisconnect = () => {
     socket.emit("join-room", quickRoomId);
   };
 
-  const updateCode = (updatedCode) => {
-    const doc = ydocRef.current;
-    const sharedText = ytextRef.current;
+  const handleEditorDidMount = (editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
 
-    if (
-      !activeRoom ||
-      !socket.connected ||
-      !isCodeSynced ||
-      !doc ||
-      !sharedText
-    ) {
-      return;
+    if (ytextRef.current) {
+      bindEditorToYjs(editor, ytextRef.current);
     }
 
-    const currentCode = sharedText.toString();
-    if (currentCode === updatedCode) return;
-
-    let prefix = 0;
-    while (
-      prefix < currentCode.length &&
-      prefix < updatedCode.length &&
-      currentCode[prefix] === updatedCode[prefix]
-    ) {
-      prefix++;
+    const model = editor.getModel();
+    if (model && !model.isDisposed()) {
+      monaco.editor.setModelLanguage(model, language);
     }
 
-    let oldEnd = currentCode.length;
-    let newEnd = updatedCode.length;
-
-    while (
-      oldEnd > prefix &&
-      newEnd > prefix &&
-      currentCode[oldEnd - 1] === updatedCode[newEnd - 1]
-    ) {
-      oldEnd--;
-      newEnd--;
-    }
-
-    doc.transact(() => {
-      const deleteLength = oldEnd - prefix;
-      if (deleteLength > 0) {
-        sharedText.delete(prefix, deleteLength);
+    editor.onDidDispose(() => {
+      if (bindingRef.current) {
+        bindingRef.current.destroy();
+        bindingRef.current = null;
       }
-
-      const insertedText = updatedCode.slice(prefix, newEnd);
-      if (insertedText.length > 0) {
-        sharedText.insert(prefix, insertedText);
-      }
+      editorRef.current = null;
+      monacoRef.current = null;
     });
+  };
+
+  const handleLanguageChange = (newLanguage) => {
+    setLanguage(newLanguage);
+
+    if (editorRef.current && monacoRef.current) {
+      const model = editorRef.current.getModel();
+      if (model && !model.isDisposed()) {
+        monacoRef.current.editor.setModelLanguage(model, newLanguage);
+      }
+    }
+
+    // Propagate language change across the shared room through Yjs
+    if (activeRoom && yconfigRef.current && socket.connected) {
+      yconfigRef.current.set("language", newLanguage);
+    }
   };
 
   return (
@@ -530,46 +628,48 @@ const onDisconnect = () => {
 
             <div className="code-placeholder">
               <div className="code-toolbar">
-                <span>JavaScript</span>
+                <div className="code-toolbar-left">
+                  <label htmlFor="editor-language-select" className="code-toolbar-label">
+                    Language:
+                  </label>
+                  <select
+                    id="editor-language-select"
+                    className="editor-language-select"
+                    value={language}
+                    onChange={(e) => handleLanguageChange(e.target.value)}
+                    aria-label="Editor Language"
+                  >
+                    {SUPPORTED_LANGUAGES.map((lang) => (
+                      <option key={lang.id} value={lang.id}>
+                        {lang.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <span className="editor-live-label">
-                  {isCodeSynced ? "Yjs synchronized" : "Connecting to room sync..."}
+                  {isCodeSynced ? "● Yjs synchronized" : "○ Connecting to room sync..."}
                 </span>
               </div>
 
-              
-
-<Editor
-  height="100%"
-  language="javascript"
-  theme="vs-dark"
-  value={codeContent}
-  onMount={(editor, monaco) => {
-    const doc = ydocRef.current;
-    const sharedText = ytextRef.current;
-
-    if (!doc || !sharedText) return;
-
-    const model = editor.getModel();
-    if (!model) return;
-
-    editor.onDidDispose(() => {
-      binding.destroy();
-    });
-  }}
-  onChange={(value) => updateCode(value ?? "")}
-  options={{
-    readOnly: !activeRoom || !isCodeSynced,
-    automaticLayout: true,
-    minimap: { enabled: false },
-    fontSize: 14,
-    wordWrap: "on",
-    scrollBeyondLastLine: false,
-    padding: { top: 16 },
-  }}
-  loading="Loading code editor..."
-/>
-
-
+              <div className="editor-container-wrapper">
+                <Editor
+                  height="100%"
+                  language={language}
+                  theme="vs-dark"
+                  defaultValue={DEFAULT_CODE}
+                  onMount={handleEditorDidMount}
+                  options={{
+                    readOnly: !activeRoom || !isCodeSynced,
+                    automaticLayout: true,
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    wordWrap: "on",
+                    scrollBeyondLastLine: false,
+                    padding: { top: 12 },
+                  }}
+                  loading="Loading code editor..."
+                />
+              </div>
             </div>
           </div>
         </section>

@@ -303,3 +303,78 @@ test("clearing a whiteboard does not affect another room", async () => {
 
   await noClearLeak;
 });
+
+test("concurrent code edits on shared Yjs code text converge between clients", async () => {
+  const roomId = "concurrent-crdt-room";
+
+  // Client 1 connects and receives initial yjs:sync
+  const socket1 = io(url, { transports: ["websocket"], forceNew: true });
+  sockets.push(socket1);
+  await waitFor(socket1, "connect");
+  const initialSync1Promise = waitFor(socket1, "yjs:sync");
+  socket1.emit("join-room", roomId);
+  const sync1Data = await initialSync1Promise;
+
+  const doc1 = new Y.Doc();
+  Y.applyUpdate(doc1, new Uint8Array(sync1Data.update));
+  const text1 = doc1.getText("code");
+
+  // Client 2 connects and receives initial yjs:sync
+  const socket2 = io(url, { transports: ["websocket"], forceNew: true });
+  sockets.push(socket2);
+  await waitFor(socket2, "connect");
+  const initialSync2Promise = waitFor(socket2, "yjs:sync");
+  socket2.emit("join-room", roomId);
+  const sync2Data = await initialSync2Promise;
+
+  const doc2 = new Y.Doc();
+  Y.applyUpdate(doc2, new Uint8Array(sync2Data.update));
+  const text2 = doc2.getText("code");
+
+  // Confirm both start with the same text
+  assert.equal(text1.toString(), text2.toString());
+
+  // Setup listeners for yjs:update on both sides
+  const remoteOrigin = {};
+  socket1.on("yjs:update", (data) => {
+    if (data.roomId === roomId) {
+      Y.applyUpdate(doc1, new Uint8Array(data.update), remoteOrigin);
+    }
+  });
+  socket2.on("yjs:update", (data) => {
+    if (data.roomId === roomId) {
+      Y.applyUpdate(doc2, new Uint8Array(data.update), remoteOrigin);
+    }
+  });
+
+  doc1.on("update", (update, origin) => {
+    if (origin !== remoteOrigin) {
+      socket1.emit("yjs:update", { roomId, update });
+    }
+  });
+  doc2.on("update", (update, origin) => {
+    if (origin !== remoteOrigin) {
+      socket2.emit("yjs:update", { roomId, update });
+    }
+  });
+
+  // Client 1 edits text at start
+  const updateReceivedAt2 = waitFor(socket2, "yjs:update");
+  doc1.transact(() => {
+    text1.insert(0, "// Concurrency Test Header\n");
+  });
+  await updateReceivedAt2;
+
+  // Client 2 edits text at end concurrently
+  const updateReceivedAt1 = waitFor(socket1, "yjs:update");
+  doc2.transact(() => {
+    text2.insert(text2.length, "\n// Footer Note");
+  });
+  await updateReceivedAt1;
+
+  // Both documents must converge to the exact same string
+  assert.equal(text1.toString(), text2.toString());
+  assert.ok(text1.toString().includes("// Concurrency Test Header"));
+  assert.ok(text1.toString().includes("// Footer Note"));
+});
+

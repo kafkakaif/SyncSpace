@@ -189,6 +189,32 @@ async function saveRoomDocument(roomId) {
   }
 }
 
+const CODE_SAVE_DEBOUNCE_MS = 1000;
+const roomCodeSaveTimers = new Map();
+
+function scheduleRoomDocumentSave(roomId, delay = CODE_SAVE_DEBOUNCE_MS) {
+  if (roomCodeSaveTimers.has(roomId)) {
+    clearTimeout(roomCodeSaveTimers.get(roomId));
+  }
+
+  const timer = setTimeout(() => {
+    roomCodeSaveTimers.delete(roomId);
+    saveRoomDocument(roomId).catch((error) => {
+      console.error(`Unable to save code session for room ${roomId}:`, error.message);
+    });
+  }, delay);
+
+  roomCodeSaveTimers.set(roomId, timer);
+}
+
+async function flushRoomDocumentSave(roomId) {
+  if (roomCodeSaveTimers.has(roomId)) {
+    clearTimeout(roomCodeSaveTimers.get(roomId));
+    roomCodeSaveTimers.delete(roomId);
+  }
+  return saveRoomDocument(roomId);
+}
+
 
 
 function toUpdateBuffer(update) {
@@ -481,13 +507,7 @@ socket.on("create-room", async (roomId, acknowledge) => {
       update,
     });
 
-    void saveRoomDocument(roomId).catch((error) => {
-      console.error("Unable to save code session:", error.message);
-
-      socket.emit("room-error", {
-        message: "Code was synchronized, but saving the session failed.",
-      });
-    });
+    scheduleRoomDocumentSave(roomId);
   });
 
 
