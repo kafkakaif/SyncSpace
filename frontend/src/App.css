@@ -1702,6 +1702,24 @@ section[id] {
   font-family: var(--font-mono);
 }
 
+.nav-center-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.participant-count {
+  padding: 5px 10px;
+  border: 1px solid #d0edd1;
+  border-radius: 9999px;
+  background: var(--primary-light, #f0faf1);
+  color: var(--primary-dark, #23964b);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .nav-quick-actions {
   display: flex;
   align-items: center;
@@ -2049,10 +2067,42 @@ section[id] {
   box-shadow: 0 0 0 2px rgba(83, 197, 87, 0.25);
 }
 
+.syncspace-page-wrapper .code-runner-button {
+  border: 1px solid rgba(83, 197, 87, 0.45);
+  background: rgba(83, 197, 87, 0.14);
+  color: #d1fae5;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.syncspace-page-wrapper .code-runner-button:hover:not(:disabled) {
+  background: rgba(83, 197, 87, 0.22);
+  transform: translateY(-1px);
+}
+
+.syncspace-page-wrapper .code-runner-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .syncspace-page-wrapper .editor-live-label {
   font-size: 12px;
   color: var(--primary, #53c557);
   font-weight: 500;
+}
+
+.syncspace-page-wrapper .code-runner-disclosure {
+  margin: 0;
+  padding: 6px 12px;
+  color: #d1d5db;
+  background: #1e1e1e;
+  font-size: 11px;
+  line-height: 1.4;
+  border-bottom: 1px solid #2d2d30;
 }
 
 .syncspace-page-wrapper .editor-container-wrapper {
@@ -2061,6 +2111,49 @@ section[id] {
   width: 100%;
   position: relative;
   overflow: hidden;
+}
+
+.syncspace-page-wrapper .code-runner-output {
+  border-top: 1px solid #2d2d30;
+  background: #111827;
+  color: #f3f4f6;
+  min-height: 108px;
+  max-height: 180px;
+  display: flex;
+  flex-direction: column;
+}
+
+.syncspace-page-wrapper .code-output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  background: rgba(15, 23, 42, 0.8);
+  border-bottom: 1px solid #2d2d30;
+}
+
+.syncspace-page-wrapper .code-output-text {
+  margin: 0;
+  padding: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: #d1fae5;
+  overflow: auto;
+}
+
+.syncspace-page-wrapper .preview-iframe {
+  width: 100%;
+  flex: 1;
+  border: none;
+  background: white;
 }
 
 .syncspace-code-editor {
@@ -2943,5 +3036,3 @@ section[id] {
     max-width: none;
   }
 }
-
-

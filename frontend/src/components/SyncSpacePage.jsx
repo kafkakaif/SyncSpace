@@ -4,6 +4,7 @@ import Editor from "@monaco-editor/react";
 import { MonacoBinding } from "y-monaco";
 import { toast } from "react-toastify";
 import socket from "../services/socket";
+import { runCodeOnJudge0 } from "../services/codeRunner";
 import WhiteboardCanvas from "./WhiteboardCanvas";
 
 const STARTER_CODE = {
@@ -144,6 +145,9 @@ export default function SyncSpacePage({
   );
   const [participants, setParticipants] = useState([]);
   const [remoteCursors, setRemoteCursors] = useState([]);
+  const [runOutput, setRunOutput] = useState("Press Run to execute the current script.");
+  const [isRunning, setIsRunning] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
 
   const activeRoomRef = useRef("");
   const ydocRef = useRef(null);
@@ -504,6 +508,88 @@ const onDisconnect = () => {
     });
   };
 
+  const formatConsoleValue = (value) => {
+    if (typeof value === "string") return value;
+    if (value instanceof Error) return value.stack || value.message;
+    if (typeof value === "object") {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
+      }
+    }
+    return String(value);
+  };
+
+  const handleRunCode = async () => {
+    const sourceCode = editorRef.current?.getValue?.() ?? ytextRef.current?.toString?.() ?? "";
+
+    if (!sourceCode.trim()) {
+      setRunOutput("The editor is empty. Add some code before running.");
+      return;
+    }
+
+    setIsRunning(true);
+    setPreviewHtml("");
+
+    try {
+      if (language === "html") {
+        setPreviewHtml(sourceCode);
+        setRunOutput("HTML preview refreshed successfully.");
+        return;
+      }
+
+      if (["typescript", "python", "cpp", "java", "sql"].includes(language)) {
+        setRunOutput("Sending code to Judge0 CE for execution...");
+        const output = await runCodeOnJudge0(sourceCode, language);
+        setRunOutput(output);
+        return;
+      }
+
+      if (language === "css" || language === "json" || language === "markdown") {
+        setRunOutput(`${language.toUpperCase()} is not an executable program.`);
+        return;
+      }
+
+      const logger = {
+        log: (...args) => setRunOutput((current) => {
+          const next = current === "Press Run to execute the current script." ? "" : current;
+          return `${next}${next ? "\n" : ""}${args.map(formatConsoleValue).join(" ")}`.trim();
+        }),
+        info: (...args) => setRunOutput((current) => {
+          const next = current === "Press Run to execute the current script." ? "" : current;
+          return `${next}${next ? "\n" : ""}${args.map(formatConsoleValue).join(" ")}`.trim();
+        }),
+        warn: (...args) => setRunOutput((current) => {
+          const next = current === "Press Run to execute the current script." ? "" : current;
+          return `${next}${next ? "\n" : ""}WARN: ${args.map(formatConsoleValue).join(" ")}`.trim();
+        }),
+        error: (...args) => setRunOutput((current) => {
+          const next = current === "Press Run to execute the current script." ? "" : current;
+          return `${next}${next ? "\n" : ""}ERROR: ${args.map(formatConsoleValue).join(" ")}`.trim();
+        }),
+        clear: () => setRunOutput(""),
+      };
+
+      const runner = new Function("console", `
+        try {
+          ${sourceCode}
+        } catch (error) {
+          console.error(error instanceof Error ? error.message : String(error));
+        }
+      `);
+
+      setRunOutput("");
+      runner(logger);
+    } catch (error) {
+      setRunOutput(
+        `Execution failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
   const handleLanguageChange = (newLanguage) => {
     setLanguage(newLanguage);
 
@@ -564,6 +650,12 @@ const onDisconnect = () => {
           <span className="room-status-indicator">
             {activeRoom ? `Connected Room: ${activeRoom}` : "No Room Joined"}
           </span>
+          {activeRoom && (
+            <span className="participant-count" aria-live="polite">
+              {participants.length}{" "}
+              {participants.length === 1 ? "participant" : "participants"}
+            </span>
+          )}
         </div>
 
         <div className="nav-quick-actions">
@@ -631,61 +723,6 @@ const onDisconnect = () => {
           </p>
         )}
 
-        {activeRoom && (
-          <section
-            className="panel"
-            aria-label="Room participants"
-            style={{ marginBottom: "16px", padding: "16px" }}
-          >
-            <h2 style={{ marginTop: 0 }}>
-              Participants ({participants.length})
-            </h2>
-
-            {participants.length > 0 ? (
-              <ul
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "12px",
-                  listStyle: "none",
-                  margin: 0,
-                  padding: 0,
-                }}
-              >
-                {participants.map((participant) => (
-                  <li
-                    key={participant.socketId}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      padding: "8px 12px",
-                      borderRadius: "20px",
-                      background: "rgba(83, 197, 87, 0.12)",
-                    }}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        width: "8px",
-                        height: "8px",
-                        borderRadius: "50%",
-                        background: "#53C557",
-                      }}
-                    />
-                    {participant.name}
-                    {participant.socketId === socket.id ? " (You)" : ""}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p style={{ marginBottom: 0 }}>
-                Waiting for participants to connect...
-              </p>
-            )}
-          </section>
-        )}
-
         <section className="workspace">
           <div className="panel">
             <div className="panel-heading">
@@ -728,11 +765,22 @@ const onDisconnect = () => {
                       </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    className="code-runner-button"
+                    onClick={handleRunCode}
+                    disabled={isRunning}
+                  >
+                    {isRunning ? "Running..." : "Run"}
+                  </button>
                 </div>
                 <span className="editor-live-label">
                   {isCodeSynced ? "● Yjs synchronized" : "○ Connecting to room sync..."}
                 </span>
               </div>
+              <p className="code-runner-disclosure">
+                TypeScript, Python, C++, Java and SQL are sent to Judge0 CE. Avoid running private or sensitive code.
+              </p>
 
               <div className="editor-container-wrapper">
                 <Editor
@@ -752,6 +800,22 @@ const onDisconnect = () => {
                   }}
                   loading="Loading code editor..."
                 />
+              </div>
+
+              <div className="code-runner-output">
+                <div className="code-output-header">
+                  <span>Output</span>
+                </div>
+                {previewHtml ? (
+                  <iframe
+                    title="Code preview"
+                    className="preview-iframe"
+                    srcDoc={previewHtml}
+                    sandbox="allow-scripts allow-modals"
+                  />
+                ) : (
+                  <pre className="code-output-text">{runOutput}</pre>
+                )}
               </div>
             </div>
           </div>
