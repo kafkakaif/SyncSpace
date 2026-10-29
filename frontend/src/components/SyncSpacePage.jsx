@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
+import {
+  Awareness,
+  applyAwarenessUpdate,
+  encodeAwarenessUpdate,
+  removeAwarenessStates,
+} from "y-protocols/awareness";
 import Editor from "@monaco-editor/react";
 import { MonacoBinding } from "y-monaco";
 import { toast } from "react-toastify";
@@ -143,6 +149,9 @@ export default function SyncSpacePage({
   const [displayName] = useState(
     () => `User-${Math.random().toString(36).slice(2, 6)}`
   );
+  const [cursorColor] = useState(
+    () => `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0")}`
+  );
   const [participants, setParticipants] = useState([]);
   const [remoteCursors, setRemoteCursors] = useState([]);
   const [runOutput, setRunOutput] = useState("Press Run to execute the current script.");
@@ -151,6 +160,8 @@ export default function SyncSpacePage({
 
   const activeRoomRef = useRef("");
   const ydocRef = useRef(null);
+  const awarenessRef = useRef(null);
+  const awarenessUpdateHandlerRef = useRef(null);
   const ytextRef = useRef(null);
   const yconfigRef = useRef(null);
   const editorRef = useRef(null);
@@ -178,7 +189,8 @@ export default function SyncSpacePage({
       bindingRef.current = new MonacoBinding(
         text,
         model,
-        new Set([editor])
+        new Set([editor]),
+        awarenessRef.current
       );
     } catch (error) {
       console.error("Unable to bind Monaco Editor to Yjs text type:", error);
@@ -191,15 +203,51 @@ export default function SyncSpacePage({
       bindingRef.current = null;
     }
 
+    if (awarenessRef.current) {
+      if (awarenessUpdateHandlerRef.current) {
+        awarenessRef.current.off("update", awarenessUpdateHandlerRef.current);
+      }
+      awarenessRef.current.destroy();
+      awarenessRef.current = null;
+      awarenessUpdateHandlerRef.current = null;
+    }
+
     ydocRef.current?.destroy();
 
     const doc = new Y.Doc();
+    const awareness = new Awareness(doc);
     const sharedText = doc.getText("code");
     const sharedConfig = doc.getMap("config");
 
     ydocRef.current = doc;
+    awarenessRef.current = awareness;
     ytextRef.current = sharedText;
     yconfigRef.current = sharedConfig;
+
+    const onAwarenessUpdate = ({ added, updated, removed }, origin) => {
+      if (
+        origin === remoteYjsOriginRef.current ||
+        !socket.connected ||
+        activeRoomRef.current !== joinedRoomId
+      ) {
+        return;
+      }
+
+      const changedClients = [...added, ...updated, ...removed];
+      if (!changedClients.includes(awareness.clientID)) return;
+
+      socket.emit("yjs:awareness", {
+        roomId: joinedRoomId,
+        clientId: awareness.clientID,
+        update: encodeAwarenessUpdate(awareness, [awareness.clientID]),
+      });
+    };
+    awarenessUpdateHandlerRef.current = onAwarenessUpdate;
+    awareness.on("update", onAwarenessUpdate);
+    awareness.setLocalStateField("user", {
+      name: displayName,
+      color: cursorColor,
+    });
 
     // Synchronize language if room already has a configured language
     const roomLanguage = sharedConfig.get("language");
@@ -241,12 +289,21 @@ export default function SyncSpacePage({
         update,
       });
     });
-  }, [bindEditorToYjs]);
+  }, [bindEditorToYjs, cursorColor, displayName]);
 
   const destroyYjsDocument = useCallback(() => {
     if (bindingRef.current) {
       bindingRef.current.destroy();
       bindingRef.current = null;
+    }
+
+    if (awarenessRef.current) {
+      if (awarenessUpdateHandlerRef.current) {
+        awarenessRef.current.off("update", awarenessUpdateHandlerRef.current);
+      }
+      awarenessRef.current.destroy();
+      awarenessRef.current = null;
+      awarenessUpdateHandlerRef.current = null;
     }
 
     ydocRef.current?.destroy();
@@ -388,6 +445,7 @@ const onDisconnect = () => {
 
         if (initialSync) {
           setIsCodeSynced(true);
+          socket.emit("yjs:awareness:sync-request", data.roomId);
           const savedLang = doc.getMap("config")?.get("language");
           if (savedLang && typeof savedLang === "string") {
             setLanguage(savedLang);
@@ -429,14 +487,60 @@ const onDisconnect = () => {
       );
     };
 
+    const onYjsAwareness = (data) => {
+      if (!data || data.roomId !== activeRoomRef.current) return;
+      const awareness = awarenessRef.current;
+      const update = toYjsUpdate(data.update);
+      if (!awareness || !update) return;
+
+      applyAwarenessUpdate(awareness, update, remoteYjsOriginRef.current);
+    };
+
+    const onYjsAwarenessRemove = (data) => {
+      if (
+        !data ||
+        data.roomId !== activeRoomRef.current ||
+        !Array.isArray(data.clientIds)
+      ) {
+        return;
+      }
+
+      const awareness = awarenessRef.current;
+      if (awareness) {
+        removeAwarenessStates(
+          awareness,
+          data.clientIds.filter(Number.isSafeInteger),
+          remoteYjsOriginRef.current
+        );
+      }
+    };
+
+    const onYjsAwarenessSyncRequest = (data) => {
+      if (!data || data.roomId !== activeRoomRef.current) return;
+      const awareness = awarenessRef.current;
+      if (!awareness?.getLocalState()) return;
+
+      socket.emit("yjs:awareness", {
+        roomId: data.roomId,
+        clientId: awareness.clientID,
+        update: encodeAwarenessUpdate(awareness, [awareness.clientID]),
+      });
+    };
+
     socket.on("yjs:sync", onYjsSync);
     socket.on("yjs:update", onYjsUpdate);
     socket.on("awareness:changed", onAwarenessChanged);
+    socket.on("yjs:awareness", onYjsAwareness);
+    socket.on("yjs:awareness:remove", onYjsAwarenessRemove);
+    socket.on("yjs:awareness:sync-request", onYjsAwarenessSyncRequest);
 
     return () => {
       socket.off("yjs:sync", onYjsSync);
       socket.off("yjs:update", onYjsUpdate);
       socket.off("awareness:changed", onAwarenessChanged);
+      socket.off("yjs:awareness", onYjsAwareness);
+      socket.off("yjs:awareness:remove", onYjsAwarenessRemove);
+      socket.off("yjs:awareness:sync-request", onYjsAwarenessSyncRequest);
     };
   }, [bindEditorToYjs]);
 
