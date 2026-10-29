@@ -34,6 +34,7 @@ const io = new Server(server, {
 
 const roomDocuments = new Map();
 const roomAwareness = new Map();
+const roomYjsAwarenessClients = new Map();
 const roomWhiteboardObjects = new Map();
 const roomWhiteboardSaveQueues = new Map();
 
@@ -284,6 +285,23 @@ function removeAwareness(socket, roomId) {
   broadcastAwareness(roomId);
 }
 
+function removeYjsAwareness(socket, roomId) {
+  const clients = roomYjsAwarenessClients.get(roomId);
+  const clientIds = clients?.get(socket.id);
+
+  if (!clientIds) return;
+
+  clients.delete(socket.id);
+  if (clients.size === 0) {
+    roomYjsAwarenessClients.delete(roomId);
+  }
+
+  socket.to(roomId).emit("yjs:awareness:remove", {
+    roomId,
+    clientIds: [...clientIds],
+  });
+}
+
 app.get("/health", (req, res) => {
   res.json({
     status: "success",
@@ -323,6 +341,7 @@ io.on("connection", (socket) => {
       }
 
       removeAwareness(socket, roomId);
+      removeYjsAwareness(socket, roomId);
       socket.leave(roomId);
     }
   };
@@ -468,6 +487,7 @@ socket.on("create-room", async (roomId, acknowledge) => {
     }
 
     removeAwareness(socket, roomId);
+    removeYjsAwareness(socket, roomId);
     socket.leave(roomId);
 
     socket.emit("room-left", {
@@ -526,6 +546,47 @@ socket.on("create-room", async (roomId, acknowledge) => {
     });
 
     scheduleRoomDocumentSave(roomId);
+  });
+
+  socket.on("yjs:awareness", (data) => {
+    if (!data || typeof data !== "object") return;
+
+    const { roomId, clientId } = data;
+    const update = toUpdateBuffer(data.update);
+
+    if (
+      typeof roomId !== "string" ||
+      !socket.rooms.has(roomId) ||
+      !Number.isSafeInteger(clientId) ||
+      clientId <= 0 ||
+      !update ||
+      update.byteLength === 0 ||
+      update.byteLength > 64 * 1024
+    ) {
+      return;
+    }
+
+    if (!roomYjsAwarenessClients.has(roomId)) {
+      roomYjsAwarenessClients.set(roomId, new Map());
+    }
+
+    const roomClients = roomYjsAwarenessClients.get(roomId);
+    if (!roomClients.has(socket.id)) {
+      roomClients.set(socket.id, new Set());
+    }
+    roomClients.get(socket.id).add(clientId);
+
+    socket.to(roomId).emit("yjs:awareness", {
+      roomId,
+      clientId,
+      update,
+    });
+  });
+
+  socket.on("yjs:awareness:sync-request", (roomId) => {
+    if (typeof roomId === "string" && socket.rooms.has(roomId)) {
+      socket.to(roomId).emit("yjs:awareness:sync-request", { roomId });
+    }
   });
 
 
@@ -885,6 +946,7 @@ socket.to(roomId).emit("whiteboard:object:update", {
     for (const roomId of [...socket.rooms]) {
       if (roomId !== socket.id) {
         removeAwareness(socket, roomId);
+        removeYjsAwareness(socket, roomId);
       }
     }
   });
@@ -933,5 +995,47 @@ async function startServer() {
     });
   }
 }
+
+let isShuttingDown = false;
+
+async function shutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`Received ${signal}; flushing pending room documents.`);
+
+  let shutdownFailed = false;
+  for (const roomId of roomCodeSaveTimers.keys()) {
+    clearTimeout(roomCodeSaveTimers.get(roomId));
+    roomCodeSaveTimers.delete(roomId);
+  }
+
+  const pendingSaves = [...roomDocuments.keys()].map(async (roomId) => {
+    try {
+      await flushRoomDocumentSave(roomId);
+    } catch (error) {
+      shutdownFailed = true;
+      console.error(`Unable to flush code session for room ${roomId}:`, error.message);
+    }
+  });
+  await Promise.all(pendingSaves);
+
+  console.log("Pending room documents flushed; closing connections.");
+  server.closeAllConnections();
+  await new Promise((resolve) => io.close(resolve));
+  console.log("Socket.IO connections closed.");
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
+
+  if (shutdownFailed) process.exitCode = 1;
+}
+
+process.once("SIGTERM", () => void shutdown("SIGTERM"));
+process.once("SIGINT", () => void shutdown("SIGINT"));
+process.on("message", (message) => {
+  if (message?.type === "shutdown") {
+    void shutdown("IPC shutdown request");
+  }
+});
 
 startServer();

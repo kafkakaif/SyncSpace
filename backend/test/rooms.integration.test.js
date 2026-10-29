@@ -375,23 +375,43 @@ test("concurrent code edits on shared Yjs code text converge between clients", a
     }
   });
 
-  // Client 1 edits text at start
-  const updateReceivedAt2 = waitFor(socket2, "yjs:update");
-  doc1.transact(() => {
-    text1.insert(0, "// Concurrency Test Header\n");
-  });
-  await updateReceivedAt2;
-
-  // Client 2 edits text at end concurrently
   const updateReceivedAt1 = waitFor(socket1, "yjs:update");
-  doc2.transact(() => {
-    text2.insert(text2.length, "\n// Footer Note");
+  const updateReceivedAt2 = waitFor(socket2, "yjs:update");
+
+  // Both clients edit the same position before receiving the other update.
+  doc1.transact(() => {
+    text1.insert(0, "// Concurrent edit from client 1\n");
   });
-  await updateReceivedAt1;
+  doc2.transact(() => {
+    text2.insert(0, "// Concurrent edit from client 2\n");
+  });
+  await Promise.all([updateReceivedAt1, updateReceivedAt2]);
 
   // Both documents must converge to the exact same string
   assert.equal(text1.toString(), text2.toString());
-  assert.ok(text1.toString().includes("// Concurrency Test Header"));
-  assert.ok(text1.toString().includes("// Footer Note"));
+  assert.ok(text1.toString().includes("// Concurrent edit from client 1"));
+  assert.ok(text1.toString().includes("// Concurrent edit from client 2"));
 });
 
+test("Yjs editor awareness is relayed within a room and removed on disconnect", async () => {
+  const roomId = "yjs-awareness-room";
+  const sender = await connectToRoom(roomId);
+  const peer = await connectToRoom(roomId);
+  const otherRoom = await connectToRoom("yjs-awareness-private-room");
+  const clientId = 987654;
+  const update = Uint8Array.from([1, 2, 3]);
+
+  const receivedAwareness = waitFor(peer, "yjs:awareness");
+  const noCrossRoomLeak = expectNoEvent(otherRoom, "yjs:awareness");
+  sender.emit("yjs:awareness", { roomId, clientId, update });
+
+  const forwarded = await receivedAwareness;
+  assert.equal(forwarded.roomId, roomId);
+  assert.equal(forwarded.clientId, clientId);
+  assert.deepEqual([...forwarded.update], [...update]);
+  await noCrossRoomLeak;
+
+  const removed = waitFor(peer, "yjs:awareness:remove");
+  sender.disconnect();
+  assert.deepEqual(await removed, { roomId, clientIds: [clientId] });
+});

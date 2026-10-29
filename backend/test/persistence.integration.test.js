@@ -52,7 +52,7 @@ async function startServer() {
   server = spawn(process.execPath, ["server.js"], {
     cwd: backendDirectory,
     env: { ...process.env, PORT: String(port) },
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
   await waitForServer();
 }
@@ -62,7 +62,11 @@ async function stopServer() {
   if (!server || server.killed) return;
   await new Promise((resolve) => {
     server.once("exit", resolve);
-    server.kill();
+    if (server.connected) {
+      server.send({ type: "shutdown" });
+    } else {
+      server.kill();
+    }
   });
 }
 
@@ -103,12 +107,13 @@ test("MongoDB persists a Yjs room and recovers it after a backend restart", { sk
 
   await startServer();
   const { socket } = await joinRoom();
+  const { socket: collaborator } = await joinRoom();
   const marker = `// persisted ${randomUUID()}`;
   const source = new Y.Doc();
   source.getText("code").insert(0, marker);
+  const collaboratorReceivedUpdate = waitFor(collaborator, "yjs:update");
   socket.emit("yjs:update", { roomId, update: Y.encodeStateAsUpdate(source) });
-
-  await waitForPersistedDocument(marker);
+  await collaboratorReceivedUpdate;
 
   // A refreshed browser gets a new socket and must receive the current room
   // document before it begins editing again.
@@ -119,6 +124,7 @@ test("MongoDB persists a Yjs room and recovers it after a backend restart", { sk
   assert.ok(refreshed.getText("code").toString().includes(marker));
 
   await stopServer();
+  await waitForPersistedDocument(marker);
 
   await startServer();
   const { sync } = await joinRoom();
